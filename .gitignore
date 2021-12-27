@@ -1,0 +1,80 @@
+./x64
+./SavedGames
+./Release
+Release/Chess Project.ipdb
+Chess Project.vcxproj
+Chess Project.vcxproj.filters
+Chess Project.vcxproj.user
+Debug/BST.obj
+Debug/Chess Project.exe.recipe
+Debug/Chess Project.ilk
+Debug/Chess Project.log
+Debug/Chess Project.tlog/Chess Project.lastbuildstate
+Debug/Chess Project.tlog/CL.command.1.tlog
+Debug/Chess Project.tlog/CL.read.1.tlog
+Debug/Chess Project.tlog/CL.write.1.tlog
+Debug/Chess Project.tlog/link.command.1.tlog
+Debug/Chess Project.tlog/link.read.1.tlog
+Debug/Chess Project.tlog/link.write.1.tlog
+Debug/Chess Project.tlog/unsuccessfulbuild
+Debug/LinkedList.obj
+Debug/Source.obj
+Debug/vc142.idb
+Debug/vc142.pdb
+Release/Chess Project.exe.recipe
+Release/Chess Project.iobj
+Release/Chess Project.log
+Release/Chess Project.tlog/Chess Project.lastbuildstate
+Release/Chess Project.tlog/CL.command.1.tlog
+Release/Chess Project.tlog/CL.read.1.tlog
+Release/Chess Project.tlog/CL.write.1.tlog
+Release/Chess Project.tlog/link.command.1.tlog
+Release/Chess Project.tlog/link.read.1.tlog
+Release/Chess Project.tlog/link.write.1.tlog
+Release/Source.obj
+Release/vc142.pdb
+SavedGames/__pycache__/pgn_converter.cpython-39.pyc
+SavedGames/games.txt
+SavedGames/pgn_converter.py
+UserspatriDesktopChess ProjectChess ProjectChess ProjectSavedGamesgames.txt
+x64/Debug/Chess Project.Build.CppClean.log
+x64/Debug/Chess Project.exe.recipe
+x64/Debug/Chess Project.log
+x64/Debug/Chess Project.tlog/Chess Project.lastbuildstate
+x64/Debug/Chess Project.tlog/CL.command.1.tlog
+x64/Debug/Chess Project.tlog/CL.read.1.tlog
+x64/Debug/Chess Project.tlog/CL.write.1.tlog
+x64/Debug/Chess Project.tlog/link.command.1.tlog
+x64/Debug/Chess Project.tlog/link.read.1.tlog
+x64/Debug/Chess Project.tlog/link.write.1.tlog
+x64/Debug/Chess Project.vcxproj.FileListAbsolute.txt
+x64/Debug/chess_engine.nativecodeanalysis.sarif
+x64/Debug/chess_engine.obj
+x64/Debug/CodeAnalysisResultManifest.txt
+x64/Debug/main.nativecodeanalysis.sarif
+x64/Debug/main.obj
+x64/Debug/MCTS.nativecodeanalysis.sarif
+x64/Debug/MCTS.obj
+x64/Debug/position.nativecodeanalysis.sarif
+x64/Debug/position.obj
+x64/Debug/tables.nativecodeanalysis.sarif
+x64/Debug/tables.obj
+x64/Debug/tests.nativecodeanalysis.sarif
+x64/Debug/tests.obj
+x64/Debug/types.nativecodeanalysis.sarif
+x64/Debug/types.obj
+x64/Debug/vc142.idb
+x64/Debug/vc142.pdb
+x64/Release/Chess Project.exe.recipe
+x64/Release/Chess Project.iobj
+x64/Release/Chess Project.ipdb
+x64/Release/Chess Project.log
+x64/Release/Chess Project.tlog/Chess Project.lastbuildstate
+x64/Release/Chess Project.tlog/CL.command.1.tlog
+x64/Release/Chess Project.tlog/CL.read.1.tlog
+x64/Release/Chess Project.tlog/CL.write.1.tlog
+x64/Release/Chess Project.tlog/link.command.1.tlog
+x64/Release/Chess Project.tlog/link.read.1.tlog
+x64/Release/Chess Project.tlog/link.write.1.tlog
+x64/Release/Source.obj
+x64/Release/vc142.pdb
