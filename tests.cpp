@@ -31,6 +31,23 @@ static bool writeLegalMoves(Position& p, int moves[ROWS][COLS][MOVES_PER_SQUARE]
 	return true;
 }
 
+void testMCTSbitlogic() {
+	float prob = 0.32f;
+	Move m = Move();
+	MCTSNode n = MCTSNode(prob, m, WHITE);
+	cout << n.get_prob() << "\n";
+	assert(n.get_color() == WHITE);
+	assert(!n.is_terminal_position());
+	n.mark_terminal_position();
+	assert(n.is_terminal_position());
+
+	n = MCTSNode(prob, m, BLACK);
+	assert(n.get_color() == BLACK);
+	assert(!n.is_terminal_position());
+	n.mark_terminal_position();
+	assert(n.is_terminal_position());
+}
+
 void test_prio_queue() {
 	PriorityQueue<int> q;
 	q.push(5, 5.0);
@@ -177,7 +194,7 @@ void select_and_update_no_errors() {
 		for (int c = 0; c < COLS; c++)
 		{
 			for (int i = 0; i < MOVES_PER_SQUARE; i++)
-				dummy_policy[r][c][i] = 0.10;
+				dummy_policy[r][c][i] = 0.10f;
 		}
 	}
 	Ndarray<int, 2> board(
@@ -231,7 +248,7 @@ void select_best_move_test() {
 		for (int c = 0; c < COLS; c++)
 		{
 			for (int i = 0; i < MOVES_PER_SQUARE; i++)
-				dummy_policy[r][c][i] = 0.10;
+				dummy_policy[r][c][i] = 0.10f;
 		}
 	}
 
@@ -240,22 +257,21 @@ void select_best_move_test() {
 		new long[2]{ ROWS, COLS },
 		new long[2]{ COLS, 1 }
 	);
-
 	while (m->current_sims() < SIMS) {
 		m->select(CPUCT, board);
 		m->update(0.00, dummy_policy);
 		if (m->current_sims() % 100000 == 0)
 			std::cout << "Current sims: " << m->current_sims() << "\n";
 	}
-	// std::cout << "Size of MCTSNode: " << sizeof(MCTSNode) << "\n";
-	// std::cout << "Number of nodes in MCTS Tree: " << m->size() << "\n";
-	// std::cout << "Number of sims ran: " << m->current_sims() << "\n";
+	std::cout << "Size of MCTSNode: " << sizeof(MCTSNode) << "\n";
+	std::cout << "Number of nodes in MCTS Tree: " << m->size() << "\n";
+	std::cout << "Number of sims ran: " << m->current_sims() << "\n";
 	vector<pair<Move, float_t>> pol = m->policy(1);
 	std::sort(pol.begin(), pol.end(), comp);
 
 	for (auto k : pol)
 	{
-		// std::cout << k.first << "\t" << k.second << "\n";
+		std::cout << k.first << "\t" << k.second << "\n";
 	}
 	// std::cout << (m->turn() ? "BLACK" : "WHITE") << "'s Q evaluation: " << m->evaluation() << "\n";
 	// std::cout << (m->turn() ? "BLACK" : "WHITE") << "'s minimax evaluation: " << m->minimax_evaluation() << "\n";
@@ -279,7 +295,7 @@ void autoplay_test() {
 		for (int c = 0; c < COLS; c++)
 		{
 			for (int i = 0; i < MOVES_PER_SQUARE; i++)
-				dummy_policy[r][c][i] = 0.10;
+				dummy_policy[r][c][i] = 0.10f;
 		}
 	}
 
@@ -322,7 +338,7 @@ void promotion_test() {
 		for (int c = 0; c < COLS; c++)
 		{
 			for (int i = 0; i < MOVES_PER_SQUARE; i++)
-				dummy_policy[r][c][i] = 0.10;
+				dummy_policy[r][c][i] = 0.10f;
 		}
 	}
 
@@ -355,7 +371,48 @@ void promotion_test() {
 
 }
 
+void memory_test() {
+	int SIMS = 1000000;
+	float CPUCT = 0.01;
+	MCTS* m = new MCTS(1000000, 1.0, false);
+	Ndarray<float, 3> dummy_policy(
+		new float[ROWS * COLS * MOVES_PER_SQUARE],
+		new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
+		new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
+	);
+	for (int r = 0; r < ROWS; r++)
+	{
+		for (int c = 0; c < COLS; c++)
+		{
+			for (int i = 0; i < MOVES_PER_SQUARE; i++)
+				dummy_policy[r][c][i] = 0.10f;
+		}
+	}
+
+	Ndarray<int, 2> board(
+		new int[ROWS * COLS],
+		new long[2]{ ROWS, COLS },
+		new long[2]{ COLS, 1 }
+	);
+
+	while (m->current_sims() < SIMS) {
+		m->select(CPUCT, board);
+		m->update(0.00, dummy_policy);
+		if (m->current_sims() % 100000 == 0)
+			std::cout << "Current sims: " << m->current_sims() << "\n";
+	}
+	std::cout << "Size of MCTSNode: " << sizeof(MCTSNode) << "\n";
+	std::cout << "Number of nodes in MCTS Tree: " << m->size() << "\n";
+	std::cout << "Number of sims ran: " << m->current_sims() << "\n";
+}
+
+void sizeof_node_test() {
+	cout << sizeof(Test);
+}
+
 void run_all_tests() {
+	/*
+	print_test(&testMCTSbitlogic, "MCTSNode bit logic test");
 	print_test(&test_prio_queue, "Priority Queue Test");
 	print_test(&rotation_test, "Rotation Test");
 	print_test(&policy_completeness_test, "Policy Completeness Test");
@@ -364,4 +421,7 @@ void run_all_tests() {
 	print_test(&select_best_move_test, "Select Best Move Test");
 	print_test(&autoplay_test, "Autoplay Test");
 	print_test(&promotion_test, "Promotion Test");
+	print_test(&memory_test, "Memory Test");
+	*/
+	print_test(&sizeof_node_test, "Size of node test");
 }

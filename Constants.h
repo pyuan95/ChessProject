@@ -3,7 +3,7 @@
 #include "ndarray.h"
 
 const int MOVES_PER_SQUARE = 73;
-const float_t EPSILON = pow(10, -20);
+const float EPSILON = pow(10.0f, -20.0f);
 const int ROWS = 8;
 const int COLS = 8;
 const int MOVE_SIZE = ROWS * COLS * MOVES_PER_SQUARE;

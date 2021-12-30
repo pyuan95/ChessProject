@@ -114,7 +114,7 @@ PolicyIndex move2index(const Position& p, Move m, Color color)
 			num = diff / EAST;
 		}
 		else {
-			cout << "Illegal argument provided to move2index: queen move";
+			cout << "Illegal argument provided to move2index: queen move\t" << m;
 			throw runtime_error("Illegal argument provided to move2index: Queen move");
 		}
 		num = abs(num);
@@ -148,7 +148,7 @@ PolicyIndex move2index(const Position& p, Move m, Color color)
 			dir = 7;
 			break;
 		default:
-			cout << "Illegal argument provided to move2index: knight move";
+			cout << "Illegal argument provided to move2index: knight move\t" << m;
 			throw runtime_error("Illegal argument provided to move2index: Knight move");
 		}
 		i = dir + 56;
@@ -185,7 +185,7 @@ PolicyIndex move2index(const Position& p, Move m, Color color)
 			dir = prom ? 2 : 1;
 			break;
 		default :
-			cout << "Illegal argument provided to move2index: pawn move:";
+			cout << "Illegal argument provided to move2index: pawn move\t" << m;
 			throw runtime_error("Illegal argument provided to move2index: pawn move");
 			break;
 		}
@@ -216,42 +216,29 @@ MCTSNode* MCTSNode::select_best_child(const float cpuct)
 {
 	MCTSNode* res = nullptr;
 	float best = -FLT_MAX;
-	for (MCTSNode* child : children)
+	float start = cpuct * std::sqrt((float) get_num_times_selected());
+	float u;
+	for (MCTSNode& child : *this)
 	{
-		float u = cpuct * child->get_prob();
-		u *= std::sqrt(get_num_times_selected()) / (1.0 + child->get_num_times_selected());
-		if (u - child->get_mean_q() > best) // mean q is evaluated for the other side; we want to minimize the other side's success.
+		// mean q is evaluated for the other side; we want to minimize the other side's success.
+		u = start * child.get_prob() / (1.0f + child.get_num_times_selected()) - child.get_mean_q();
+		if (u > best)
 		{
-			best = u - child->get_mean_q();
-			res = child;
+			best = u;
+			res = &child;
 		}
-		// std::cout << "Child count: " << child->get_num_times_selected() << "\tvalue: " << u - child->get_mean_q() << "\n";
+		// std::cout << "Child count: " << child.get_num_times_selected() << "\tvalue: " << u - child.get_mean_q() << "\n";
 	}
-
-	if (leaves.empty() || best > cpuct * leaves.back().second * std::sqrt(get_num_times_selected()))
-		return res;
-	else if (!leaves.empty()) {
-		MCTSNode* newNode;
-		auto k = leaves.back();
-		if (get_color() == WHITE)
-			newNode = new MCTSNode(k.second, k.first, BLACK);
-		else
-			newNode = new MCTSNode(k.second, k.first, WHITE);
-		leaves.pop_back();
-		children.push_back(newNode);
-
-		return newNode;
-	}
-	return nullptr;
+	return res;
 }
 
 float* MCTSNode::calculate_policy_cumsum(float temperature)
 {
-	float* cum_sum = new float[children.size()];
+	float* cum_sum = new float[num_children];
 	float d = get_num_times_selected();
-	*cum_sum = pow(children[0]->get_num_times_selected() / d, 1 / temperature);
-	for (int i = 1; i < children.size(); i++) {
-		*(cum_sum + i) = *(cum_sum + i - 1) + pow(children[i]->get_num_times_selected() / d, 1 / temperature);
+	*cum_sum = pow(children[0].get_num_times_selected() / d, 1 / temperature);
+	for (int i = 1; i < num_children; i++) {
+		cum_sum[i] = cum_sum[i - 1] + pow(children[i].get_num_times_selected() / d, 1 / temperature);
 	}
 	return cum_sum;
 }
@@ -259,12 +246,12 @@ float* MCTSNode::calculate_policy_cumsum(float temperature)
 float* MCTSNode::calculate_policy(float temperature)
 {
 	float* cum_sum = calculate_policy_cumsum(temperature);
-	float largest = *(cum_sum + children.size() - 1) + pow(10, -10); // to avoid div by 0 errors
+	float largest = cum_sum[num_children - 1] + pow(10.0f, -10.0f); // to avoid div by 0 errors
 	float prev = 0;
-	for (int i = 0; i < children.size(); i++)
+	for (int i = 0; i < num_children; i++)
 	{
-		*(cum_sum + i) = (*(cum_sum + i) / largest) - prev;
-		prev += *(cum_sum + i);
+		cum_sum[i] = (cum_sum[i] / largest) - prev;
+		prev += cum_sum[i];
 	}
 	return cum_sum;
 }
@@ -273,44 +260,41 @@ vector<pair<Move, float>> MCTSNode::policy(float temperature)
 {
 	float* s = calculate_policy(temperature);
 	vector<pair<Move, float>> policy;
-	for (int i = 0; i < children.size(); i++)
-		policy.push_back(pair<Move, float>(children[i]->get_move(), *(s + i)));
+	for (int i = 0; i < num_children; i++)
+		policy.push_back(pair<Move, float>(children[i].get_move(), s[i]));
 	delete[] s;
-	for (auto k : leaves)
-		policy.push_back(pair<Move, float>(k.first, 0.0));  // each leaf has a count of zero, so also a prob of zero.
 	return policy;
 }
 
 MCTSNode* MCTSNode::select_best_child_by_count(float temperature)
 {
+	if (num_children == 0) {
+		return nullptr;
+	}
 	float* cum_sum = calculate_policy_cumsum(temperature);
-	float thresh = rand_num(0, cum_sum[children.size() - 1] + EPSILON);
-	for (int i = 0; i < children.size(); i++)
+	float thresh = rand_num(0, cum_sum[num_children - 1] + EPSILON);
+	for (int i = 0; i < num_children; i++)
 	{
-		if (*(cum_sum + i) >= thresh)
+		if (cum_sum[i] >= thresh)
 		{
 			delete[] cum_sum;
-			return children[i];
+			return children + i;
 		}
 	}
-	delete[] cum_sum;
-	if (children.size() > 0)
-		return children.back();
-	else  // the only children are leaves, which have count == 0
-		return nullptr;
+	return children + num_children - 1;
 }
 
 float MCTSNode::minimax_evaluation()
 {
-	if (children.size() == 0) // we don't want to do minimax if we have no children, or all the children are leaves.
+	if (num_children == 0) // we don't want to do minimax if we have no children, or all the children are leaves.
 		return get_mean_q();
 	else
 	{
-		float min_eval = DBL_MAX;
-		for (MCTSNode* child : children) {
-			if (!child->is_leaf() || child->is_terminal_position())
+		float min_eval = FLT_MAX;
+		for (MCTSNode child : *this) {
+			if (!child.is_leaf() || child.is_terminal_position())
 				// find the move that's worst for our opponent. use that move.
-				min_eval = std::min(child->minimax_evaluation(), min_eval);
+				min_eval = std::min(child.minimax_evaluation(), min_eval);
 		}
 
 		return -1 * min_eval;
@@ -321,17 +305,20 @@ void MCTSNode::expand(Position& p, Ndarray<float, 3> policy, const Move* moves, 
 {
 	if (!is_terminal_position()) {
 		float tot = 0;
+		vector<float> probs(size, 0);
+		PolicyIndex i;
 		for (int j = 0; j < size; j++)
 		{
-			PolicyIndex i = move2index(p, moves[j], color);
-			auto kk = policy[2];
+			i = move2index(p, moves[j], get_color());
 			float prob = exp(policy[i.r][i.c][i.i]);
 			tot += prob;
-			leaves.push_back(pair<Move, float>(moves[j], prob));
+			probs[j] = prob;
 		}
-		for (auto &k : leaves)
-			k.second /= tot;
-		std::sort(leaves.begin(), leaves.end(), compare_leaf);
+		children = new MCTSNode[size];
+		for (int j = 0; j < size; j++) {
+			children[j] = MCTSNode(probs[j] / tot, moves[j], ~get_color());
+		}
+		num_children = size;
 	}
 }
 
@@ -361,9 +348,9 @@ size_t MCTS::move_num() {
 }
 
 size_t MCTSNode::size() {
-	size_t tot = 1 + leaves.size();
-	for (MCTSNode* child : children)
-		tot += child->size();
+	size_t tot = 1;
+	for (MCTSNode& child : *this)
+		tot += child.size();
 	return tot;
 }
 
@@ -440,7 +427,7 @@ bool MCTS::select_helper(const float cpuct, Ndarray<int, 2>& board)
 			best_leaf->mark_terminal_position();
 	}
 	// our leaf is a terminal position. return true.
-	if (best_leaf->is_terminal_position())
+	if (best_leaf->is_terminal_position()) 
 	{
 		return true;
 	}
@@ -487,7 +474,7 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 	{
 		cur = best_leaf_path.back();
 		best_leaf_path.pop_back();
-		cur->backup(cur->get_color() == best_leaf_color ? q : -1.0 * q);
+		cur->backup(cur->get_color() == best_leaf_color ? q : -1.0f * q);
 		if (cur != root) {
 			if (cur->get_color() == WHITE)
 				p.undo<BLACK>(cur->get_move());
@@ -530,9 +517,8 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 		else if (root_color == BLACK)
 			p.play<BLACK>(m);
 
-		//update root
-		MCTSNode* newRoot = new MCTSNode(*best_child); // make a deep copy of the best child
-		delete root; // delete the contents of the old root
+		MCTSNode* newRoot = new MCTSNode(*best_child); // shallow copy the best child
+		recursive_delete(*root, best_child);
 		root = newRoot;
 
 		// add the move to the game.
@@ -546,4 +532,14 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 			new_game();
 		}
 	}
+}
+
+void recursive_delete(MCTSNode& n, MCTSNode* ignore) {
+	if (&n == ignore)
+		return;
+	for (MCTSNode& m : n) {
+		recursive_delete(m, ignore);
+	}
+	if (n.end() > n.begin())
+		delete[] n.begin();
 }

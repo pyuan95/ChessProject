@@ -52,48 +52,60 @@ The class that represents a node in the MCTS Tree
 */
 class MCTSNode {
 private:
-	const float prob;
+	// 14 bits for probability. then two bits store itp and color.
+	uint16_t prob_color_itp;
+	uint8_t num_children;
 	float q;
-	Move move;
 	uint32_t num_times_selected;
-	bool itp;
-	const Color color;
-	vector<MCTSNode*> children; // may or may not be leaves.
-	vector<pair<Move, float>> leaves; // to save memory, we dont make MCTSNode from leaf until it's about to be expanded.
+	MCTSNode* children;
+	Move move;
+
+	inline void set_terminal_position(bool itp) { prob_color_itp = prob_color_itp | ((int) itp); }
+
+	inline void set_color(Color c) { prob_color_itp = prob_color_itp | (c << 1u); }
+
+	inline void set_prob(float probability) {
+		unsigned int v = probability * 0x3fffu;
+		prob_color_itp = prob_color_itp | (v << 2u);
+	}
 
 public:
-	 
-	// returns true if this node is a leaf. node may or may not be terminal as well.
-	inline bool is_leaf() { return children.size() == 0 && leaves.size() == 0; }
 
-	// returns the color of the side whose turn it is to play
-	inline Color get_color() { return color; }
+	// returns true if this node is a leaf. node may or may not be terminal as well.
+	inline bool is_leaf() { return num_children == 0; }
 
 	// returns true if this node is a terminal position ( no moves available, game has ended. is not a leaf. )
-	inline bool is_terminal_position() { return itp; }
+	inline bool is_terminal_position() { return prob_color_itp & 1u; }
+
+	// returns the color of the side whose turn it is to play
+	inline Color get_color() { return (prob_color_itp >> 1) & 1u ? BLACK : WHITE; }
 
 	// marks the current node as terminal position.
-	inline void mark_terminal_position() { itp = true; }
+	inline void mark_terminal_position() { set_terminal_position(true); }
 
 	// returns the probability of selecting this node.
-	inline float get_prob() { return prob; }
+	inline float get_prob() { return (prob_color_itp >> 2) / (float) 0x3fffu ; }
 
 	// returns the number of times this node was selected.
-	inline int get_num_times_selected() { return num_times_selected; }
+	inline uint32_t get_num_times_selected() { return num_times_selected; }
 
 	// returns the move that was used to get from the previous position to the current position.
 	inline Move get_move() { return move; }
 
-	// returns the Q value for this node.
-	inline float get_mean_q() { return num_times_selected > 0 ? q / num_times_selected : 0.0; }
+	// returns the q value for this node. value is relative to this node's color (1 is good for current color, -1 is bad)
+	inline float get_mean_q() { return num_times_selected > 0 ? q / num_times_selected : 0.0f; }
+
+	inline MCTSNode* begin() { return children; }
+
+	inline MCTSNode* end() { return children + num_children; }
 
 	// the q value must be calculated given the color of the node.
-	inline void backup(float q);
+	void backup(float q);
 
 	// expands the node given the policy. the q value must be updated using the update method.
 	// requires: the current node is a leaf. If it is terminal, no changes are made.
 	// policy is appropriately rotated if the player is black.
-	inline void expand(Position& p, Ndarray<float, 3> policy, const Move* moves, size_t size);
+	void expand(Position& p, Ndarray<float, 3> policy, const Move* moves, size_t size);
 
 	// returns the number of nodes currently under this tree.
 	size_t size();
@@ -128,22 +140,21 @@ public:
 	// this node was never selected for expansion.
 	MCTSNode* select_best_child_by_count(float temperature=1.0);
 
-	MCTSNode(const float probability, Move m, Color c) : prob(probability), q(0), num_times_selected(0),
-		itp(false), color(c), children(), move(m) {}
-	MCTSNode(const MCTSNode& other) : prob(other.prob), q(other.q), num_times_selected(other.num_times_selected),
-		itp(other.itp), color(other.color), move(other.move), children() {
-		for (MCTSNode* c : other.children)
-		{
-			children.push_back(new MCTSNode(*c));
-		}
+	MCTSNode(float probability, Move m, Color c) :
+		prob_color_itp(0),
+		num_children(0),
+		q(0),
+		num_times_selected(0),
+		children(0),
+		move(m) {
+		set_prob(probability);
+		set_color(c);
 	}
-	MCTSNode& operator=(MCTSNode other) = delete; // we have constant members so this operator cannot be implemented.
-	~MCTSNode() {
-		for (MCTSNode* c : children) {
-			delete c;
-		}
-	}
+
+	MCTSNode() {} // only used for making the array
 };
+
+void recursive_delete(MCTSNode& n, MCTSNode* ignore);
 
 /*
 Represents an MCTS Tree
@@ -159,7 +170,7 @@ private:
 	Position p;
 	vector<Game> game_history;
 	bool auto_play;
-	const int sims;
+	uint32_t sims;
 	const float default_temp;
 
 	// adds a move to the current game
@@ -249,9 +260,18 @@ public:
 		sims(num_sims_per_move), game_history(1, Game()), temperature(t), default_temp(t),
 		auto_play(auto_play), white_moves(nullptr), black_moves(nullptr) {}
 
-	~MCTS() { if (root != nullptr) delete root; }
+	~MCTS() { if (root != nullptr) recursive_delete(*root, nullptr); }
 
 	MCTS& operator=(MCTS other) = delete;
 	MCTS(const MCTS& other) = delete;
+};
+
+class Test {
+	uint8_t color_itp;
+	uint8_t num_children;
+	// uint8_t num_expanded;
+	float q;
+	uint32_t num_times_selected;
+	MCTSNode* children;
 };
 
