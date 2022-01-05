@@ -4,6 +4,7 @@
 #include <iostream>
 #include <algorithm>
 #include "PriorityQueue.h"
+#include <unordered_set>
 
 template<Color color>
 static bool writeLegalMoves(Position& p, int moves[ROWS][COLS][MOVES_PER_SQUARE], bool fillzeros) {
@@ -31,17 +32,34 @@ static bool writeLegalMoves(Position& p, int moves[ROWS][COLS][MOVES_PER_SQUARE]
 	return true;
 }
 
+void test_move_set() {
+	MCTSNode m(WHITE);
+	Position p;
+	MoveList<WHITE> moves(p);
+	unordered_set<uint16_t> stored_moves;
+	for (Move m : moves) {
+		stored_moves.insert(m.get_representation());
+	}
+	m.expand(p, DUMMY_POLICY, moves.begin(), moves.size());
+	assert(m.get_num_children() == moves.size());
+
+	for (int i = 0; i < m.get_num_children(); i++) {
+		Move stored(((uint16_t*)(m.begin_children() + i * 3L))[0]);
+		stored_moves.erase(stored.get_representation());
+	}
+	assert(stored_moves.empty());
+}
+
 void testMCTSbitlogic() {
 	float prob = 0.32f;
 	Move m = Move();
-	MCTSNode n = MCTSNode(prob, m, WHITE);
-	cout << n.get_prob() << "\n";
+	MCTSNode n(WHITE);
 	assert(n.get_color() == WHITE);
 	assert(!n.is_terminal_position());
 	n.mark_terminal_position();
 	assert(n.is_terminal_position());
 
-	n = MCTSNode(prob, m, BLACK);
+	n = MCTSNode(BLACK);
 	assert(n.get_color() == BLACK);
 	assert(!n.is_terminal_position());
 	n.mark_terminal_position();
@@ -275,7 +293,7 @@ void select_best_move_test() {
 	}
 	// std::cout << (m->turn() ? "BLACK" : "WHITE") << "'s Q evaluation: " << m->evaluation() << "\n";
 	// std::cout << (m->turn() ? "BLACK" : "WHITE") << "'s minimax evaluation: " << m->minimax_evaluation() << "\n";
-	assert(m->get_best_move(0.1).from() == b7); // assert that we found the move that leads to mate in 5.
+	assert(m->get_best_move(0.1f).from() == b7); // assert that we found the move that leads to mate in 5.
 	delete m;
 }
 
@@ -373,7 +391,7 @@ void promotion_test() {
 
 void memory_test() {
 	int SIMS = 1000000;
-	float CPUCT = 0.01;
+	float CPUCT = 0.01f;
 	MCTS* m = new MCTS(1000000, 1.0, false);
 	Ndarray<float, 3> dummy_policy(
 		new float[ROWS * COLS * MOVES_PER_SQUARE],
@@ -404,14 +422,13 @@ void memory_test() {
 	std::cout << "Size of MCTSNode: " << sizeof(MCTSNode) << "\n";
 	std::cout << "Number of nodes in MCTS Tree: " << m->size() << "\n";
 	std::cout << "Number of sims ran: " << m->current_sims() << "\n";
-}
-
-void sizeof_node_test() {
-	cout << sizeof(Test);
+	while (1) {
+		
+	}
 }
 
 void run_all_tests() {
-	/*
+	print_test(&test_move_set, "test MCTSNode setting moves");
 	print_test(&testMCTSbitlogic, "MCTSNode bit logic test");
 	print_test(&test_prio_queue, "Priority Queue Test");
 	print_test(&rotation_test, "Rotation Test");
@@ -422,6 +439,4 @@ void run_all_tests() {
 	print_test(&autoplay_test, "Autoplay Test");
 	print_test(&promotion_test, "Promotion Test");
 	print_test(&memory_test, "Memory Test");
-	*/
-	print_test(&sizeof_node_test, "Size of node test");
 }

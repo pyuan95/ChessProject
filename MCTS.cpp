@@ -1,11 +1,7 @@
 #include "MCTS.h"
-#include <math.h>
-#include <random>
-#include <ctime>
-#include <fstream>
 
 bool compare_leaf(pair<Move, float> x, pair<Move, float> y) {
-	return x.second < y.second; // sort increasing
+	return x.second > y.second; // sort decreasing by probability
 }
 
 int invert(int piece)
@@ -35,8 +31,8 @@ void writePosition(const Position& p, Ndarray<int, 2>& board) {
 		for (int c = 0; c < COLS; c++)
 		{
 			piece = p.at(create_square(File(c), Rank(r)));
-			if (color == BLACK) // invert and rotate
-			{
+			if (color == BLACK) {
+				// invert and rotate
 				piece = invert(piece);
 				board[ROWS - r - 1][COLS - c - 1] = piece;
 			}
@@ -79,7 +75,7 @@ float evaluateTerminalPosition(const Position& p)
 
 void init_rand()
 {
-	std::srand(std::time(nullptr));
+	std::srand((unsigned int) std::time(nullptr));
 }
 
 PolicyIndex move2index(const Position& p, Move m, Color color)
@@ -148,7 +144,8 @@ PolicyIndex move2index(const Position& p, Move m, Color color)
 			dir = 7;
 			break;
 		default:
-			cout << "Illegal argument provided to move2index: knight move\t" << m;
+			cout << "Illegal argument provided to move2index: knight move\t" << m << "\n";
+			cout << p;
 			throw runtime_error("Illegal argument provided to move2index: Knight move");
 		}
 		i = dir + 56;
@@ -212,33 +209,54 @@ PolicyIndex move2index(const Position& p, Move m, Color color)
 	return policyIndex;
 }
 
-MCTSNode* MCTSNode::select_best_child(const float cpuct)
+MCTSNode* MCTSNode::add_leaf() {
+	reallocate_memory();
+
+	get_node_at(num_expanded) = MCTSNode(~get_color());
+	num_expanded++;
+
+	return begin_nodes() + num_expanded - 1;
+}
+
+std::pair<MCTSNode*, Move> MCTSNode::select_best_child(const float cpuct)
 {
 	MCTSNode* res = nullptr;
-	float best = -FLT_MAX;
-	float start = cpuct * std::sqrt((float) get_num_times_selected());
+	Move best_move(0);
+	float best(-FLT_MAX);
+	float start(cpuct * std::sqrt((float) get_num_times_selected()));
 	float u;
-	for (MCTSNode& child : *this)
-	{
+	if (num_expanded < num_children) {
+		best = start * get_prob_at(num_expanded); // calculating with the leaf w the highest prob
+		best_move = get_move_at(num_expanded);
+	}
+
+	for (int i = 0; i < num_expanded; i++) {
 		// mean q is evaluated for the other side; we want to minimize the other side's success.
-		u = start * child.get_prob() / (1.0f + child.get_num_times_selected()) - child.get_mean_q();
-		if (u > best)
-		{
+		MCTSNode& child = get_node_at(i);
+		u = start * get_prob_at(i) / (1.0f + child.get_num_times_selected()) - child.get_mean_q();
+		if (u > best) {
 			best = u;
 			res = &child;
+			best_move = get_move_at(i);
 		}
 		// std::cout << "Child count: " << child.get_num_times_selected() << "\tvalue: " << u - child.get_mean_q() << "\n";
 	}
-	return res;
+
+	if (res == nullptr && num_expanded < num_children) {
+		// the best leaf won!
+		res = add_leaf();
+	}
+
+	return std::pair<MCTSNode*, Move>(res, best_move);
 }
 
 float* MCTSNode::calculate_policy_cumsum(float temperature)
 {
-	float* cum_sum = new float[num_children];
-	float d = get_num_times_selected();
-	*cum_sum = pow(children[0].get_num_times_selected() / d, 1 / temperature);
-	for (int i = 1; i < num_children; i++) {
-		cum_sum[i] = cum_sum[i - 1] + pow(children[i].get_num_times_selected() / d, 1 / temperature);
+	float* cum_sum = new float[num_expanded];
+	float d = (float) get_num_times_selected();
+	*cum_sum = pow(get_node_at(0).get_num_times_selected() / d, 1 / temperature);
+	for (int i = 1; i < num_expanded; i++) {
+		cum_sum[i] = cum_sum[i - 1] + pow(get_node_at(i).get_num_times_selected() / d, 1 / temperature);
 	}
 	return cum_sum;
 }
@@ -246,10 +264,9 @@ float* MCTSNode::calculate_policy_cumsum(float temperature)
 float* MCTSNode::calculate_policy(float temperature)
 {
 	float* cum_sum = calculate_policy_cumsum(temperature);
-	float largest = cum_sum[num_children - 1] + pow(10.0f, -10.0f); // to avoid div by 0 errors
-	float prev = 0;
-	for (int i = 0; i < num_children; i++)
-	{
+	float largest = cum_sum[num_expanded - 1] + EPSILON; // to avoid div by 0 errors
+	float prev = 0.0f;
+	for (int i = 0; i < num_expanded; i++) {
 		cum_sum[i] = (cum_sum[i] / largest) - prev;
 		prev += cum_sum[i];
 	}
@@ -260,38 +277,39 @@ vector<pair<Move, float>> MCTSNode::policy(float temperature)
 {
 	float* s = calculate_policy(temperature);
 	vector<pair<Move, float>> policy;
-	for (int i = 0; i < num_children; i++)
-		policy.push_back(pair<Move, float>(children[i].get_move(), s[i]));
+	for (int i = 0; i < num_expanded; i++)
+		policy.push_back(pair<Move, float>(get_move_at(i), s[i]));
 	delete[] s;
 	return policy;
 }
 
-MCTSNode* MCTSNode::select_best_child_by_count(float temperature)
+std::pair<MCTSNode*, Move> MCTSNode::select_best_child_by_count(float temperature)
 {
-	if (num_children == 0) {
-		return nullptr;
+	if (num_expanded == 0) {
+		return std::pair<MCTSNode*, Move>(nullptr, 0);
 	}
 	float* cum_sum = calculate_policy_cumsum(temperature);
-	float thresh = rand_num(0, cum_sum[num_children - 1] + EPSILON);
-	for (int i = 0; i < num_children; i++)
-	{
-		if (cum_sum[i] >= thresh)
-		{
+	float thresh = rand_num(0, cum_sum[num_expanded - 1] + EPSILON);
+	for (int i = 0; i < num_expanded; i++) {
+		if (cum_sum[i] >= thresh) {
 			delete[] cum_sum;
-			return children + i;
+			return std::pair<MCTSNode*, Move>(begin_nodes() + i, get_move_at(i));
 		}
 	}
-	return children + num_children - 1;
+	// should never happen, but to be safe...
+	delete cum_sum;
+	return std::pair<MCTSNode*, Move>(begin_nodes() + num_expanded - 1, get_move_at(num_expanded - 1));
 }
 
 float MCTSNode::minimax_evaluation()
 {
-	if (num_children == 0) // we don't want to do minimax if we have no children, or all the children are leaves.
+	if (num_expanded == 0) // we don't want to do minimax if we have no children, or all the children are leaves.
 		return get_mean_q();
 	else
 	{
 		float min_eval = FLT_MAX;
-		for (MCTSNode child : *this) {
+		for (int i = 0; i < num_expanded; i++) {
+			MCTSNode& child = get_node_at(i);
 			if (!child.is_leaf() || child.is_terminal_position())
 				// find the move that's worst for our opponent. use that move.
 				min_eval = std::min(child.minimax_evaluation(), min_eval);
@@ -303,22 +321,27 @@ float MCTSNode::minimax_evaluation()
 
 void MCTSNode::expand(Position& p, Ndarray<float, 3> policy, const Move* moves, size_t size)
 {
-	if (!is_terminal_position()) {
+	if (!is_terminal_position() && is_leaf() && size > 0) {
+		// first, initialize the memory for children
+		num_children = (uint8_t) size;
+		init_memory();
+
 		float tot = 0;
-		vector<float> probs(size, 0);
-		PolicyIndex i;
-		for (int j = 0; j < size; j++)
-		{
-			i = move2index(p, moves[j], get_color());
-			float prob = exp(policy[i.r][i.c][i.i]);
+		vector<pair<Move, float>> leaves(size, pair<Move, float>(0, 0.0f));
+		PolicyIndex policyIndex;
+		for (int i = 0; i < size; i++) {
+			policyIndex = move2index(p, moves[i], get_color());
+			float prob = exp(policy[policyIndex.r][policyIndex.c][policyIndex.i]);
 			tot += prob;
-			probs[j] = prob;
+			leaves[i].first = moves[i];
+			leaves[i].second = prob;
 		}
-		children = new MCTSNode[size];
-		for (int j = 0; j < size; j++) {
-			children[j] = MCTSNode(probs[j] / tot, moves[j], ~get_color());
+		std::sort(leaves.begin(), leaves.end(), compare_leaf);
+
+		for (int i = 0; i < num_children; i++) {
+			set_move_at(i, leaves[i].first);
+			set_prob_at(i, leaves[i].second / tot);
 		}
-		num_children = size;
 	}
 }
 
@@ -348,9 +371,9 @@ size_t MCTS::move_num() {
 }
 
 size_t MCTSNode::size() {
-	size_t tot = 1;
-	for (MCTSNode& child : *this)
-		tot += child.size();
+	size_t tot = 1 + num_children - num_expanded;
+	for (int i = 0; i < num_expanded; i++)
+		tot += get_node_at(i).size();
 	return tot;
 }
 
@@ -371,7 +394,7 @@ void MCTS::new_game()
 	// delete and reset old resources
 	if (root != nullptr) 
 		delete root;
-	root = new MCTSNode(1.0, Move(0), WHITE);
+	root = new MCTSNode(WHITE);
 	best_leaf = nullptr;
 	best_leaf_path.clear();
 	p = Position();
@@ -392,20 +415,21 @@ void MCTS::select(const float cpuct, Ndarray<int, 2> board) {
 bool MCTS::select_helper(const float cpuct, Ndarray<int, 2>& board)
 {
 	MCTSNode* cur = root;
-	best_leaf_path.push_back(cur);
+	best_leaf_path.push_back(std::pair<MCTSNode*, Move>(cur, 0));
 	while (!(cur->is_leaf())) {
-		MCTSNode* child = cur->select_best_child(cpuct);
+		auto child = cur->select_best_child(cpuct);
 		if (cur->get_color() == WHITE)
-			p.play<WHITE>(child->get_move());
-		else if (cur->get_color() == BLACK)
-			p.play<BLACK>(child->get_move());
-		cur = child;
-		best_leaf_path.push_back(cur);
+			p.play<WHITE>(child.second);
+		else
+			p.play<BLACK>(child.second);
+		best_leaf_path.push_back(std::pair<MCTSNode*, Move>(child.first, child.second));
+
+		cur = child.first;
 	}
 	best_leaf = cur;
-	if (!best_leaf->is_terminal_position()) // check if our leaf is a terminal position. If so, mark it.
-	{
-		bool itp = false;
+	if (!best_leaf->is_terminal_position()) {
+		// check if our leaf is a terminal position. If so, mark it.
+		bool itp(false);
 		if (best_leaf->get_color() == WHITE) {
 			white_moves = new MoveList<WHITE>(p);
 			if (white_moves->size() == 0) {
@@ -414,8 +438,7 @@ bool MCTS::select_helper(const float cpuct, Ndarray<int, 2>& board)
 				itp = true;
 			}
 		}
-		else
-		{
+		else {
 			black_moves = new MoveList<BLACK>(p);
 			if (black_moves->size() == 0) {
 				delete black_moves;
@@ -427,12 +450,11 @@ bool MCTS::select_helper(const float cpuct, Ndarray<int, 2>& board)
 			best_leaf->mark_terminal_position();
 	}
 	// our leaf is a terminal position. return true.
-	if (best_leaf->is_terminal_position()) 
-	{
+	if (best_leaf->is_terminal_position()) {
 		return true;
 	}
-	else // our leaf is not a terminal position.
-	{
+	// our leaf is not a terminal position.
+	else {
 		if (best_leaf->get_color() == WHITE) {
 			writePosition<WHITE>(p, board);
 		}
@@ -445,7 +467,6 @@ bool MCTS::select_helper(const float cpuct, Ndarray<int, 2>& board)
 
 void MCTS::update(const float q, Ndarray<float, 3> policy)
 {
-	// std::cout << p;
 	if (root->get_num_times_selected() >= sims && !auto_play) {
 		// over the max sims and no auto-play; simply exit. but we need to maintain our invariants.
 		if (best_leaf_path.size() > 0 || best_leaf != nullptr) {
@@ -454,7 +475,6 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 		}
 		return;
 	}
-
 	Color best_leaf_color = best_leaf->get_color();
 	if (white_moves != nullptr && best_leaf_color == WHITE) {
 		best_leaf->expand(p, policy, white_moves->begin(), white_moves->size());
@@ -470,16 +490,17 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 
 	// backpropagate the q value.
 	MCTSNode* cur;
-	while (!best_leaf_path.empty())
-	{
-		cur = best_leaf_path.back();
+	Move m;
+	while (!best_leaf_path.empty()) {
+		cur = best_leaf_path.back().first;
+		m = best_leaf_path.back().second;
 		best_leaf_path.pop_back();
 		cur->backup(cur->get_color() == best_leaf_color ? q : -1.0f * q);
 		if (cur != root) {
 			if (cur->get_color() == WHITE)
-				p.undo<BLACK>(cur->get_move());
+				p.undo<BLACK>(m);
 			else
-				p.undo<WHITE>(cur->get_move());
+				p.undo<WHITE>(m);
 		}
 	}
 
@@ -509,16 +530,16 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 			writePosition<BLACK>(p, board_state.b);
 
 		// update the board position
-		MCTSNode* best_child = root->select_best_child_by_count(temperature);
-		Move m = best_child->get_move();
+		pair<MCTSNode*, Move> best_child = root->select_best_child_by_count(temperature);
+		Move m = best_child.second;
 		Color root_color = root->get_color();
 		if (root_color == WHITE)
 			p.play<WHITE>(m);
-		else if (root_color == BLACK)
+		else
 			p.play<BLACK>(m);
 
-		MCTSNode* newRoot = new MCTSNode(*best_child); // shallow copy the best child
-		recursive_delete(*root, best_child);
+		MCTSNode* newRoot = new MCTSNode(*(best_child.first)); // shallow copy the best child
+		recursive_delete(*root, best_child.first);
 		root = newRoot;
 
 		// add the move to the game.
@@ -537,9 +558,10 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 void recursive_delete(MCTSNode& n, MCTSNode* ignore) {
 	if (&n == ignore)
 		return;
-	for (MCTSNode& m : n) {
-		recursive_delete(m, ignore);
+	MCTSNode* nodes = n.begin_nodes();
+	for (int i = 0; i < n.get_num_expanded(); i++) {
+		recursive_delete(nodes[i], ignore);
 	}
-	if (n.end() > n.begin())
-		delete[] n.begin();
+	if (n.get_num_children() > 0)
+		free(n.begin_children());
 }

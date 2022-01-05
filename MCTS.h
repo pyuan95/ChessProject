@@ -1,10 +1,16 @@
 #pragma once
 #include <vector>
+#include <algorithm>
+#include <math.h>
+#include <random>
+#include <ctime>
+#include <fstream>
 #include "Constants.h"
 #include "position.h"
 #include "types.h"
 #include "tables.h"
 #include "ndarray.h"
+
 
 using namespace std;
 
@@ -53,51 +59,87 @@ The class that represents a node in the MCTS Tree
 class MCTSNode {
 private:
 	// 14 bits for probability. then two bits store itp and color.
-	uint16_t prob_color_itp;
+	uint8_t color_itp;
 	uint8_t num_children;
+	uint8_t num_expanded;
 	float q;
 	uint32_t num_times_selected;
-	MCTSNode* children;
-	Move move;
+	uint8_t* children;
 
-	inline void set_terminal_position(bool itp) { prob_color_itp = prob_color_itp | ((int) itp); }
+	inline void set_terminal_position(bool itp) { color_itp = color_itp | ((int)itp); }
 
-	inline void set_color(Color c) { prob_color_itp = prob_color_itp | (c << 1u); }
+	inline void set_color(Color c) { color_itp = color_itp | (c << 1u); }
 
-	inline void set_prob(float probability) {
-		unsigned int v = probability * 0x3fffu;
-		prob_color_itp = prob_color_itp | (v << 2u);
+	inline float convert_prob(uint8_t p) { return (p + 0.5f) / 256.0f; }
+
+	inline void set_prob_at(long long node_num, float prob) { (children + node_num * 3L)[2] = (uint8_t) std::min(prob * 256.0f, 255.0f); }
+
+	inline float get_prob_at(long long node_num) { return convert_prob((children + node_num * 3L)[2]); }
+
+	inline void set_move_at(long long node_num, Move m) { ((uint16_t*)(children + node_num * 3L))[0] = m.get_representation(); }
+
+	inline Move get_move_at(long long node_num) { return ((uint16_t*) (children + node_num * 3L))[0]; }
+
+	inline MCTSNode& get_node_at(int node_num) { return begin_nodes()[node_num]; }
+
+	inline void reallocate_memory() {
+		if (num_expanded % 5 == 0) {
+			int s = sizeof(uint8_t) * 3 * ((int) num_children) + sizeof(MCTSNode) * std::min(num_expanded + 5, (int)num_children);
+			void* new_children = realloc(children, s);
+			if (new_children == nullptr) {
+				std::cout << "error reallocing children. exiting...";
+				free(children);
+				exit(1);
+			}
+			children = (uint8_t*) new_children;
+		}
 	}
 
+	inline void init_memory() {
+		int s = sizeof(uint8_t) * 3 * ((int) num_children);
+		children = (uint8_t*) malloc(s);
+		if (children == nullptr) {
+			std::cout << "error allocating children. exiting...";
+			exit(1);
+		}
+	}
+
+	// adds a leaf to the nodes
+	MCTSNode* add_leaf();
+
 public:
+
+	inline size_t get_num_expanded() { return num_expanded; }
+
+	inline size_t get_num_children() { return num_children; }
 
 	// returns true if this node is a leaf. node may or may not be terminal as well.
 	inline bool is_leaf() { return num_children == 0; }
 
 	// returns true if this node is a terminal position ( no moves available, game has ended. is not a leaf. )
-	inline bool is_terminal_position() { return prob_color_itp & 1u; }
+	inline bool is_terminal_position() { return color_itp & 1u; }
 
 	// returns the color of the side whose turn it is to play
-	inline Color get_color() { return (prob_color_itp >> 1) & 1u ? BLACK : WHITE; }
+	inline Color get_color() { return (color_itp >> 1) & 1u ? BLACK : WHITE; }
 
 	// marks the current node as terminal position.
 	inline void mark_terminal_position() { set_terminal_position(true); }
 
-	// returns the probability of selecting this node.
-	inline float get_prob() { return (prob_color_itp >> 2) / (float) 0x3fffu ; }
-
 	// returns the number of times this node was selected.
 	inline uint32_t get_num_times_selected() { return num_times_selected; }
-
-	// returns the move that was used to get from the previous position to the current position.
-	inline Move get_move() { return move; }
 
 	// returns the q value for this node. value is relative to this node's color (1 is good for current color, -1 is bad)
 	inline float get_mean_q() { return num_times_selected > 0 ? q / num_times_selected : 0.0f; }
 
-	inline MCTSNode* begin() { return children; }
+	inline MCTSNode* begin_nodes() { return (MCTSNode*) (children + ((long long) num_children) * 3L); }
 
-	inline MCTSNode* end() { return children + num_children; }
+	inline MCTSNode* end_nodes() { return begin_nodes() + num_expanded; }
+
+	inline uint8_t* begin_children() { return children; }
+
+	inline uint8_t* begin_leaves() { return children + ((long long)num_expanded) * 3L; }
+
+	inline uint8_t* end_leaves() { return children + ((long long)num_children) * 3L; }
 
 	// the q value must be calculated given the color of the node.
 	void backup(float q);
@@ -114,7 +156,7 @@ public:
 	float minimax_evaluation();
 
 	// calculates the policy and returns it as a cumulative sum array. res[i] == total sum of children 0....i inclusive.
-	// size == children.size()
+	// does not include leaves, as leaves have 0 count
 	// note that this method does not return a probability distribution; cumsum was not divided by the max.
 	// remember to delete it after!
 	// no children in leaves are included.
@@ -132,22 +174,21 @@ public:
 
 	// returns the child with the highest upper bound according to the PUCT algorithm.
 	// if it has no children then null is returned.
-	MCTSNode* select_best_child(const float cpuct);
+	std::pair<MCTSNode*, Move> select_best_child(const float cpuct);
 
 	// returns the child to play based on visit count with the given temperature parameter.
 	// if there are no children that are not leaves, nullptr is returned.
 	// this can happen when the current node is a leaf (could be terminal position), or if
 	// this node was never selected for expansion.
-	MCTSNode* select_best_child_by_count(float temperature=1.0);
+	std::pair<MCTSNode*, Move> select_best_child_by_count(float temperature = 1.0);
 
-	MCTSNode(float probability, Move m, Color c) :
-		prob_color_itp(0),
+	MCTSNode(Color c) :
+		color_itp(0),
 		num_children(0),
-		q(0),
+		num_expanded(0),
+		q(0.0),
 		num_times_selected(0),
-		children(0),
-		move(m) {
-		set_prob(probability);
+		children(0) {
 		set_color(c);
 	}
 
@@ -166,7 +207,7 @@ private:
 	MCTSNode* best_leaf;
 	MoveList<WHITE>* white_moves;
 	MoveList<BLACK>* black_moves;
-	vector<MCTSNode*> best_leaf_path;
+	vector<std::pair<MCTSNode*, Move>> best_leaf_path;
 	Position p;
 	vector<Game> game_history;
 	bool auto_play;
@@ -188,7 +229,7 @@ private:
 	// white_moves and black_moves will be set to nullptr if this function returns false.
 	// requires: max sims not reached.
 	bool select_helper(const float cpuct, Ndarray<int, 2>& board);
-	
+
 public:
 
 	// the temperature to use for calculating the policy and selecting the best child by count.
@@ -196,14 +237,14 @@ public:
 
 	inline Position position() { return p; } // for debugging only
 
-	inline void set_position(Position pos) { 
-		this->p = pos; 
+	inline void set_position(Position pos) {
+		this->p = pos;
 		if (root != nullptr)
 			delete root;
 		if (pos.turn() == WHITE)
-			root = new MCTSNode(1.0, Move(0), WHITE);
+			root = new MCTSNode(WHITE);
 		else
-			root = new MCTSNode(1.0, Move(0), BLACK);
+			root = new MCTSNode(BLACK);
 		best_leaf = nullptr;
 		best_leaf_path.clear();
 	}
@@ -213,6 +254,8 @@ public:
 
 	// returns the current number of sims in the root.
 	inline int current_sims() { return root->get_num_times_selected(); }
+
+	inline void set_sims(unsigned int count) { sims = count; }
 
 	// returns whose turn it is to play. 0 for white, 1 for black.
 	inline int turn() { return p.turn(); }
@@ -229,7 +272,7 @@ public:
 	inline float minimax_evaluation() { return root->minimax_evaluation(); }
 
 	// selects the best move by count with the given temperature
-	inline Move get_best_move(float temperature) { return root->select_best_child_by_count(temperature)->get_move(); }
+	inline Move get_best_move(float temperature) { return root->select_best_child_by_count(temperature).second; }
 
 	// returns the number of nodes in this tree.
 	inline size_t size() { return root->size(); }
@@ -255,8 +298,8 @@ public:
 	void update(const float q, Ndarray<float, 3> policy);
 
 	// auto-auto_play: whether to automatically play the next move when num_sims_to_play is reached
-	MCTS(const int num_sims_per_move, float t=1.0, bool auto_play=true) :
-		root(new MCTSNode(1.0, Move(0), WHITE)), best_leaf(nullptr), best_leaf_path(), p(),
+	MCTS(const int num_sims_per_move, float t = 1.0, bool auto_play = true) :
+		root(new MCTSNode(WHITE)), best_leaf(nullptr), best_leaf_path(), p(),
 		sims(num_sims_per_move), game_history(1, Game()), temperature(t), default_temp(t),
 		auto_play(auto_play), white_moves(nullptr), black_moves(nullptr) {}
 
@@ -264,14 +307,5 @@ public:
 
 	MCTS& operator=(MCTS other) = delete;
 	MCTS(const MCTS& other) = delete;
-};
-
-class Test {
-	uint8_t color_itp;
-	uint8_t num_children;
-	// uint8_t num_expanded;
-	float q;
-	uint32_t num_times_selected;
-	MCTSNode* children;
 };
 

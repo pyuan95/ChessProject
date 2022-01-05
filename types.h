@@ -160,6 +160,8 @@ private:
 	//The internal representation of the move
 	uint16_t move;
 public:
+	inline uint16_t get_representation() { return move; }
+
 	//Defaults to a null move (a1a1)
 	inline Move() : move(0) {}
 	
