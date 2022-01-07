@@ -1,16 +1,13 @@
 #pragma once
 #include <vector>
 #include <algorithm>
-#include <math.h>
+// #include <math.h>
 #include <random>
 #include <ctime>
 #include <fstream>
 #include "Constants.h"
 #include "position.h"
-#include "types.h"
 #include "tables.h"
-#include "ndarray.h"
-
 
 using namespace std;
 
@@ -19,6 +16,9 @@ struct PolicyIndex {
 	int r;
 	int c;
 	int i;
+
+	PolicyIndex(const int& r, const int& c, const int& i) : r(r), c(c), i(i) {}
+	PolicyIndex() {}
 };
 
 // wrapper class for the policy array; we can't directly store arrays in a vector.
@@ -51,7 +51,7 @@ void writePosition(const Position& p, Ndarray<int, 2>& board);
 template<Color color>
 void writePosition(const Position& p, int board[ROWS][COLS]);
 
-PolicyIndex move2index(const Position& p, Move m, Color color);
+void move2index(const Position& p, Move m, Color color, PolicyIndex& policyIndex);
 
 /*
 The class that represents a node in the MCTS Tree

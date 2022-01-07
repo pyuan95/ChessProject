@@ -78,135 +78,15 @@ void init_rand()
 	std::srand((unsigned int) std::time(nullptr));
 }
 
-PolicyIndex move2index(const Position& p, Move m, Color color)
+void move2index(const Position& p, Move m, Color color, PolicyIndex& policyIndex)
 {
 	Square f = m.from();
-	Square t = m.to();
 	PieceType pt = type_of(p.at(f));
-	int i;
-	int diff = color == WHITE ? t - f : f - t;
-	switch (pt) {
-	int num;
-	int dir;
-	case KING:
-	case QUEEN:
-	case ROOK:
-	case BISHOP:
-		// 0, 1, 2, 3, 4, 5, 6, 7 -> N, NE, E, SE, S, SW, W, NW
-		if (diff % NORTH == 0) {
-			dir = diff > 0 ? 0 : 4;
-			num = diff / NORTH;
-		}
-		else if (diff % NORTH_EAST == 0) {
-			dir = diff > 0 ? 1 : 5;
-			num = diff / NORTH_EAST;
-		}
-		else if (diff % SOUTH_EAST == 0 && rank_of(f) != rank_of(t)) {
-			dir = diff > 0 ? 7 : 3;
-			num = diff / SOUTH_EAST;
-		}
-		else if (diff % EAST == 0 && abs(diff) < 8) {
-			dir = diff > 0 ? 2 : 6;
-			num = diff / EAST;
-		}
-		else {
-			cout << "Illegal argument provided to move2index: queen move\t" << m;
-			throw runtime_error("Illegal argument provided to move2index: Queen move");
-		}
-		num = abs(num);
-		i = dir * 7 + num - 1;
-		break;
-	case KNIGHT:
-		switch (diff)
-		{
-		case 10:
-			dir = 0;
-			break;
-		case 17:
-			dir = 1;
-			break;
-		case 15:
-			dir = 2;
-			break;
-		case 6:
-			dir = 3;
-			break;
-		case -10:
-			dir = 4;
-			break;
-		case -17:
-			dir = 5;
-			break;
-		case -15:
-			dir = 6;
-			break;
-		case -6:
-			dir = 7;
-			break;
-		default:
-			cout << "Illegal argument provided to move2index: knight move\t" << m << "\n";
-			cout << p;
-			throw runtime_error("Illegal argument provided to move2index: Knight move");
-		}
-		i = dir + 56;
-		break;
-	case PAWN: {
-		bool prom = true;
-		switch (m.flags()) {
-		case PR_BISHOP:
-		case PC_BISHOP:
-			i = 64;
-			break;
-		case PR_KNIGHT:
-		case PC_KNIGHT:
-			i = 67;
-			break;
-		case PR_ROOK:
-		case PC_ROOK:
-			i = 70;
-			break;
-		default:
-			prom = false;
-			break;
-		}
-		switch (diff)
-		{
-		case 7: // NW
-			dir = prom ? 0 : 7;
-			break;
-		case 8: // N
-		case 16: // float push
-			dir = prom ? 1 : 0;
-			break;
-		case 9: // NE
-			dir = prom ? 2 : 1;
-			break;
-		default :
-			cout << "Illegal argument provided to move2index: pawn move\t" << m;
-			throw runtime_error("Illegal argument provided to move2index: pawn move");
-			break;
-		}
-		if (!prom) {
-			i = dir * 7 + 1 - 1;
-			if (diff == 16) // double push
-				i += 1;
-		}
-		else
-			i += dir;
-		break;
-	}
-	default:
-		cout << "Illegal piecetype" << "\n";
-		cout << "Piecetype:" << pt << "\n";
-		throw runtime_error("Invalid PieceType, should never happen!");
-	}
-	PolicyIndex policyIndex;
 	if (color == BLACK)
 		f = Square(63 - f);
 	policyIndex.r = rank_of(f);
 	policyIndex.c = file_of(f);
-	policyIndex.i = i;
-	return policyIndex;
+	policyIndex.i = move2index_cache[static_cast<int>(color)][static_cast<int>(pt)][m.get_representation()];
 }
 
 MCTSNode* MCTSNode::add_leaf() {
@@ -330,7 +210,7 @@ void MCTSNode::expand(Position& p, Ndarray<float, 3> policy, const Move* moves, 
 		vector<pair<Move, float>> leaves(size, pair<Move, float>(0, 0.0f));
 		PolicyIndex policyIndex;
 		for (int i = 0; i < size; i++) {
-			policyIndex = move2index(p, moves[i], get_color());
+			move2index(p, moves[i], get_color(), policyIndex);
 			float prob = exp(policy[policyIndex.r][policyIndex.c][policyIndex.i]);
 			tot += prob;
 			leaves[i].first = moves[i];
@@ -510,15 +390,15 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 		// first, calculate the policy.
 		Policy policy;
 		vector<pair<Move, float>> policy_vec = root->policy(temperature);
+		PolicyIndex pidx;
 		for (const auto &move_and_prob : policy_vec)
 		{
-			PolicyIndex pidx;
 			Move move = move_and_prob.first;
 			float prob = move_and_prob.second;
 			if (root->get_color() == WHITE)
-				pidx = move2index(p, move, WHITE);
+				move2index(p, move, WHITE, pidx);
 			else
-				pidx = move2index(p, move, BLACK);
+				move2index(p, move, BLACK, pidx);
 			policy.p[pidx.r][pidx.c][pidx.i] = prob;
 		}
 

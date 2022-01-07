@@ -1,6 +1,5 @@
-#include "Position.h"
+#include "tests.h"
 #include "MCTS.h"
-#include <assert.h>
 #include <iostream>
 #include <algorithm>
 #include "PriorityQueue.h"
@@ -12,9 +11,9 @@ static bool writeLegalMoves(Position& p, int moves[ROWS][COLS][MOVES_PER_SQUARE]
 	if (l.size() == 0) // no moves available, this is a terminal position.
 		return false;
 
-	for (Move m : l)
-	{
-		PolicyIndex i = move2index(p, m, color);
+	PolicyIndex i;
+	for (Move m : l) {
+		move2index(p, m, color, i);
 		moves[i.r][i.c][i.i] = 1;
 	}
 	if (fillzeros)
@@ -149,7 +148,8 @@ void policy_completeness_test() {
 		for (Move m : MoveList<WHITE>(pos))
 		{
 			// cout << m << "\n";
-			PolicyIndex pi = move2index(pos, m, WHITE);
+			PolicyIndex pi;
+			move2index(pos, m, WHITE, pi);
 			count[pi.i] += 1;
 		}
 	}
@@ -168,7 +168,8 @@ void policy_completeness_test() {
 	for (Move m : MoveList<WHITE>(pawn_pos))
 	{
 		// cout << m << "\n";
-		PolicyIndex pi = move2index(pawn_pos, m, WHITE);
+		PolicyIndex pi;
+		move2index(pawn_pos, m, WHITE, pi);
 		count[pi.i] += 1;
 	}
 
@@ -192,7 +193,8 @@ void policy_completeness_test() {
 	Position::set("8/8/8/8/8/8/3P4/8 w - - 0 1", pawn_pos);
 	for (Move m : MoveList<WHITE>(pawn_pos))
 	{
-		PolicyIndex pi = move2index(pawn_pos, m, WHITE);
+		PolicyIndex pi;
+		move2index(pawn_pos, m, WHITE, pi);
 		count[pi.i] += 1;
 	}
 	assert(count[0] == 2);

@@ -1,6 +1,10 @@
 #pragma once
+#include <iostream>
 #include <math.h>
 #include "ndarray.h"
+#include "types.h"
+
+extern int move2index_initializer(PieceType pt, Move m, Color color);
 
 const int MOVES_PER_SQUARE = 73;
 const float EPSILON = pow(10.0f, -20.0f);
@@ -14,3 +18,8 @@ const Ndarray<float, 3> DUMMY_POLICY = Ndarray<float, 3>(
 	new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
 );
 const float_t DUMMY_Q = 0.0;
+extern Ndarray<int, 3> move2index_cache;
+
+
+extern void init_move2index_cache();
+
