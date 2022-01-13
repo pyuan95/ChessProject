@@ -231,6 +231,9 @@ inline Move* make<PROMOTION_CAPTURES>(Square from, Bitboard to, Move* list) {
 
 extern std::ostream& operator<<(std::ostream& os, const Move& m);
 
+extern std::ostream& operator<<(std::ostream& os, const Color& c);
+
+
 //The white king and kingside rook
 const Bitboard WHITE_OO_MASK = 0x90;
 //The white king and queenside rook

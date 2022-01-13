@@ -139,3 +139,13 @@ std::ostream& operator<<(std::ostream& os, const Move& m) {
 	return os;
 }
 
+//Prints the color
+//For example: e5d6 (capture); a7a8R; O-O
+std::ostream& operator<<(std::ostream& os, const Color& c) {
+	if (c == BLACK)
+		os << "BLACK";
+	else
+		os << "WHITE";
+	return os;
+}
+

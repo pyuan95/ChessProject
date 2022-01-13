@@ -19,6 +19,20 @@ float rand_num(float s, float l) {
 	return f;
 }
 
+// array must be initialized to all zeros
+template<Color color>
+void writeLegalMoves(const Position& p, Policy& policy) {
+	MoveList<color> l(p);
+	if (l.size() == 0) // no moves available, this is a terminal position.
+		return false;
+
+	PolicyIndex i;
+	for (Move m : l) {
+		move2index(p, m, color, i);
+		policy.p[i.r][i.c][i.i] = 1;
+	}
+}
+
 // writes a position to the given board.
 // 0...5 = our side (pawn, knight, bishop, rook, queen, king)
 // 8...13 = their side (pawn, knight, bishop, rook, queen, king)
@@ -26,10 +40,8 @@ float rand_num(float s, float l) {
 template <Color color>
 void writePosition(const Position& p, Ndarray<int, 2>& board) {
 	int piece;
-	for (int r = 0; r < ROWS; r++)
-	{
-		for (int c = 0; c < COLS; c++)
-		{
+	for (int r = 0; r < ROWS; r++) {
+		for (int c = 0; c < COLS; c++) {
 			piece = p.at(create_square(File(c), Rank(r)));
 			if (color == BLACK) {
 				// invert and rotate
@@ -66,15 +78,14 @@ void writePosition(const Position& p, int board[ROWS][COLS]) {
 float evaluateTerminalPosition(const Position& p)
 {
 	if (p.in_check<WHITE>())
-		return -1.0;
+		return -1.0f;
 	else if (p.in_check<BLACK>())
-		return 1.0;
+		return 1.0f;
 	else
-		return 0.0;
+		return 0.0f;
 }
 
-void init_rand()
-{
+void init_rand() {
 	std::srand((unsigned int) std::time(nullptr));
 }
 
@@ -98,7 +109,7 @@ MCTSNode* MCTSNode::add_leaf() {
 	return begin_nodes() + num_expanded - 1;
 }
 
-std::pair<MCTSNode*, Move> MCTSNode::select_best_child(const float cpuct)
+void MCTSNode::select_best_child(const float cpuct, std::pair<MCTSNode*, Move>& child)
 {
 	MCTSNode* res = nullptr;
 	Move best_move(0);
@@ -126,8 +137,8 @@ std::pair<MCTSNode*, Move> MCTSNode::select_best_child(const float cpuct)
 		// the best leaf won!
 		res = add_leaf();
 	}
-
-	return std::pair<MCTSNode*, Move>(res, best_move);
+	child.first = res;
+	child.second = best_move;
 }
 
 float* MCTSNode::calculate_policy_cumsum(float temperature)
@@ -181,12 +192,10 @@ std::pair<MCTSNode*, Move> MCTSNode::select_best_child_by_count(float temperatur
 	return std::pair<MCTSNode*, Move>(begin_nodes() + num_expanded - 1, get_move_at(num_expanded - 1));
 }
 
-float MCTSNode::minimax_evaluation()
-{
+float MCTSNode::minimax_evaluation() {
 	if (num_expanded == 0) // we don't want to do minimax if we have no children, or all the children are leaves.
 		return get_mean_q();
-	else
-	{
+	else {
 		float min_eval = FLT_MAX;
 		for (int i = 0; i < num_expanded; i++) {
 			MCTSNode& child = get_node_at(i);
@@ -199,7 +208,13 @@ float MCTSNode::minimax_evaluation()
 	}
 }
 
-void MCTSNode::expand(Position& p, Ndarray<float, 3> policy, const Move* moves, size_t size)
+void MCTSNode::expand(
+	Position& p,
+	Ndarray<float, 3>& policy,
+	const Move* moves,
+	size_t size,
+	vector<pair<Move, float>>& leaves
+)
 {
 	if (!is_terminal_position() && is_leaf() && size > 0) {
 		// first, initialize the memory for children
@@ -207,7 +222,7 @@ void MCTSNode::expand(Position& p, Ndarray<float, 3> policy, const Move* moves, 
 		init_memory();
 
 		float tot = 0;
-		vector<pair<Move, float>> leaves(size, pair<Move, float>(0, 0.0f));
+		// vector<pair<Move, float>> leaves(size, pair<Move, float>(0, 0.0f));
 		PolicyIndex policyIndex;
 		for (int i = 0; i < size; i++) {
 			move2index(p, moves[i], get_color(), policyIndex);
@@ -216,9 +231,10 @@ void MCTSNode::expand(Position& p, Ndarray<float, 3> policy, const Move* moves, 
 			leaves[i].first = moves[i];
 			leaves[i].second = prob;
 		}
-		std::sort(leaves.begin(), leaves.end(), compare_leaf);
 
-		for (int i = 0; i < num_children; i++) {
+		std::sort(leaves.begin(), leaves.begin() + size, compare_leaf);
+
+		for (int i = 0; i < size; i++) {
 			set_move_at(i, leaves[i].first);
 			set_prob_at(i, leaves[i].second / tot);
 		}
@@ -230,20 +246,19 @@ void MCTSNode::backup(float q) {
 	this->q += q; 
 }
 
-void MCTS::add_move(BoardState board_state, Policy p, Move m, Color c)
-{
-	Game& g = game_history.back();
-	g.color_history.push_back(c);
-	g.move_history.push_back(m);
-	g.policy_history.push_back(p);
-	g.board_history.push_back(board_state);
-
-	// std::cout << g.move_history.size() << "\n";
+void MCTS::add_move(BoardState& board_state, Policy& p, Move& m, Color& c) {
+	if (output.is_open()) {
+		output << board_state << "\n";
+		output << p << "\n";
+		output << m << "\n";
+		output << c << "\n";
+	}
 }
 
 void MCTS::declare_winner(float c)
 {
-	game_history.back().winner = c;
+	long res = std::lround(c);
+	output << res << "\n";
 }
 
 size_t MCTS::move_num() {
@@ -269,20 +284,20 @@ void MCTS::serialize_games(string name)
 	out.close();
 }
 
-void MCTS::new_game()
-{
+void MCTS::new_game() {
 	// delete and reset old resources
-	if (root != nullptr) 
+	if (root != nullptr)
 		delete root;
 	root = new MCTSNode(WHITE);
 	best_leaf = nullptr;
 	best_leaf_path.clear();
+	best_leaf_path.reserve(200);
 	p = Position();
 	temperature = default_temp;
 	game_history.push_back(Game());
 }
 
-void MCTS::select(const float cpuct, Ndarray<int, 2> board) {
+void MCTS::select(const float cpuct, Ndarray<int, 2>& board) {
 	while ((root->get_num_times_selected() < sims || auto_play) && select_helper(cpuct, board)) {
 		// select helper returned true. means p is at a terminal position now.
 		float q = evaluateTerminalPosition(p);
@@ -292,12 +307,12 @@ void MCTS::select(const float cpuct, Ndarray<int, 2> board) {
 	}
 }
 
-bool MCTS::select_helper(const float cpuct, Ndarray<int, 2>& board)
-{
+bool MCTS::select_helper(const float cpuct, Ndarray<int, 2>& board) {
 	MCTSNode* cur = root;
 	best_leaf_path.push_back(std::pair<MCTSNode*, Move>(cur, 0));
+	std::pair<MCTSNode*, Move> child(0, 0);
 	while (!(cur->is_leaf())) {
-		auto child = cur->select_best_child(cpuct);
+		cur->select_best_child(cpuct, child);
 		if (cur->get_color() == WHITE)
 			p.play<WHITE>(child.second);
 		else
@@ -311,18 +326,16 @@ bool MCTS::select_helper(const float cpuct, Ndarray<int, 2>& board)
 		// check if our leaf is a terminal position. If so, mark it.
 		bool itp(false);
 		if (best_leaf->get_color() == WHITE) {
-			white_moves = new MoveList<WHITE>(p);
-			if (white_moves->size() == 0) {
-				delete white_moves;
-				white_moves = nullptr;
+			Move* last = p.generate_legals<WHITE>(moves);
+			nmoves = last - moves;
+			if (nmoves == 0) {
 				itp = true;
 			}
 		}
 		else {
-			black_moves = new MoveList<BLACK>(p);
-			if (black_moves->size() == 0) {
-				delete black_moves;
-				black_moves = nullptr;
+			Move* last = p.generate_legals<BLACK>(moves);
+			nmoves = last - moves;
+			if (nmoves == 0) {
 				itp = true;
 			}
 		}
@@ -345,7 +358,7 @@ bool MCTS::select_helper(const float cpuct, Ndarray<int, 2>& board)
 	}
 }
 
-void MCTS::update(const float q, Ndarray<float, 3> policy)
+void MCTS::update(const float q, Ndarray<float, 3>& policy)
 {
 	if (root->get_num_times_selected() >= sims && !auto_play) {
 		// over the max sims and no auto-play; simply exit. but we need to maintain our invariants.
@@ -356,15 +369,11 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 		return;
 	}
 	Color best_leaf_color = best_leaf->get_color();
-	if (white_moves != nullptr && best_leaf_color == WHITE) {
-		best_leaf->expand(p, policy, white_moves->begin(), white_moves->size());
-		delete white_moves;
-		white_moves = nullptr;
+	if (nmoves > 0 && best_leaf_color == WHITE) {
+		best_leaf->expand(p, policy, moves, nmoves, leaves);
 	}
-	else if (black_moves != nullptr && best_leaf_color == BLACK) {
-		best_leaf->expand(p, policy, black_moves->begin(), black_moves->size());
-		delete black_moves;
-		black_moves = nullptr;
+	else if (nmoves > 0 && best_leaf_color == BLACK) {
+		best_leaf->expand(p, policy, moves, nmoves, leaves);
 	}
 	best_leaf = nullptr;
 
@@ -444,4 +453,26 @@ void recursive_delete(MCTSNode& n, MCTSNode* ignore) {
 	}
 	if (n.get_num_children() > 0)
 		free(n.begin_children());
+}
+
+ostream& operator<<(ostream& os, const Policy& p) {
+	for (int i = 0; i < ROWS; i++) {
+		for (int j = 0; j < COLS; j++) {
+			for (int k = 0; k < MOVES_PER_SQUARE; k++) {
+				os << std::to_string(p.p[i][j][k]);
+				os << ",";
+			}
+		}
+	}
+	return os;
+}
+
+ostream& operator<<(ostream& os, const BoardState& b) {
+	for (int i = 0; i < ROWS; i++) {
+		for (int j = 0; j < COLS; j++) {
+			os << std::to_string(b.b[i][j]);
+			os << ",";
+		}
+	}
+	return os;
 }

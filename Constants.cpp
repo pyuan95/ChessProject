@@ -145,3 +145,9 @@ Ndarray<int, 3> move2index_cache = Ndarray<int, 3>(
 	new long[3]{ NCOLORS, NPIECE_TYPES, (0xffff + 1) },
 	new long[3]{ NPIECE_TYPES * (0xffff + 1), (0xffff + 1), 1 }
 );
+
+Ndarray<float, 3> DUMMY_POLICY = Ndarray<float, 3>(
+	new float[ROWS * COLS * MOVES_PER_SQUARE](),
+	new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
+	new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
+);

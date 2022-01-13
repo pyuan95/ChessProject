@@ -6,17 +6,14 @@
 
 extern int move2index_initializer(PieceType pt, Move m, Color color);
 
+const int MAX_MOVES = 218;
 const int MOVES_PER_SQUARE = 73;
 const float EPSILON = pow(10.0f, -20.0f);
 const int ROWS = 8;
 const int COLS = 8;
 const int MOVE_SIZE = ROWS * COLS * MOVES_PER_SQUARE;
 const bool FILL_ZEROS = false; // whether to fill in zeros in the legal moves. may have to change later based on implementation.
-const Ndarray<float, 3> DUMMY_POLICY = Ndarray<float, 3>(
-	new float[ROWS * COLS * MOVES_PER_SQUARE](),
-	new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
-	new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
-);
+extern Ndarray<float, 3> DUMMY_POLICY;
 const float_t DUMMY_Q = 0.0;
 extern Ndarray<int, 3> move2index_cache;
 

@@ -4,7 +4,9 @@
 // #include <math.h>
 #include <random>
 #include <ctime>
+#include <cmath>
 #include <fstream>
+#include <unordered_set>
 #include "Constants.h"
 #include "position.h"
 #include "tables.h"
@@ -30,6 +32,10 @@ struct Policy {
 struct BoardState {
 	int b[ROWS][COLS];
 };
+
+extern ostream& operator<<(ostream& os, const Policy& p);
+
+extern ostream& operator<<(ostream& os, const BoardState& b);
 
 // each MCTS object will contain a member of vector<Game>, which it will use to store completed games.
 struct Game {
@@ -58,7 +64,7 @@ The class that represents a node in the MCTS Tree
 */
 class MCTSNode {
 private:
-	// 14 bits for probability. then two bits store itp and color.
+	// two bits store itp and color.
 	uint8_t color_itp;
 	uint8_t num_children;
 	uint8_t num_expanded;
@@ -72,7 +78,13 @@ private:
 
 	inline float convert_prob(uint8_t p) { return (p + 0.5f) / 256.0f; }
 
-	inline void set_prob_at(long long node_num, float prob) { (children + node_num * 3L)[2] = (uint8_t) std::min(prob * 256.0f, 255.0f); }
+	inline void set_prob_at(long long node_num, float prob) { 
+		if (!std::isfinite(prob)) {
+			cout << "prob is not finite! aborting...";
+			throw runtime_error("prob is not finite! aborting...");
+		}
+		(children + node_num * 3L)[2] = (uint8_t) std::min(prob * 256.0f, 255.0f); 
+	}
 
 	inline float get_prob_at(long long node_num) { return convert_prob((children + node_num * 3L)[2]); }
 
@@ -83,16 +95,14 @@ private:
 	inline MCTSNode& get_node_at(int node_num) { return begin_nodes()[node_num]; }
 
 	inline void reallocate_memory() {
-		if (num_expanded % 5 == 0) {
-			int s = sizeof(uint8_t) * 3 * ((int) num_children) + sizeof(MCTSNode) * std::min(num_expanded + 5, (int)num_children);
-			void* new_children = realloc(children, s);
-			if (new_children == nullptr) {
-				std::cout << "error reallocing children. exiting...";
-				free(children);
-				exit(1);
-			}
-			children = (uint8_t*) new_children;
+		int s = sizeof(uint8_t) * 3 * ((int) num_children) + sizeof(MCTSNode) * std::min(num_expanded + 1, (int)num_children);
+		void* new_children = realloc(children, s);
+		if (new_children == nullptr) {
+			std::cout << "error reallocing children. exiting...";
+			free(children);
+			exit(1);
 		}
+		children = (uint8_t*) new_children;
 	}
 
 	inline void init_memory() {
@@ -131,15 +141,15 @@ public:
 	// returns the q value for this node. value is relative to this node's color (1 is good for current color, -1 is bad)
 	inline float get_mean_q() { return num_times_selected > 0 ? q / num_times_selected : 0.0f; }
 
-	inline MCTSNode* begin_nodes() { return (MCTSNode*) (children + ((long long) num_children) * 3L); }
+	inline MCTSNode* begin_nodes() { return (MCTSNode*) (children + ((long long) (num_children * 3))); }
 
 	inline MCTSNode* end_nodes() { return begin_nodes() + num_expanded; }
 
 	inline uint8_t* begin_children() { return children; }
 
-	inline uint8_t* begin_leaves() { return children + ((long long)num_expanded) * 3L; }
+	inline uint8_t* begin_leaves() { return children + ((long long)(num_expanded * 3)); }
 
-	inline uint8_t* end_leaves() { return children + ((long long)num_children) * 3L; }
+	inline uint8_t* end_leaves() { return children + ((long long)(num_children * 3)); }
 
 	// the q value must be calculated given the color of the node.
 	void backup(float q);
@@ -147,7 +157,13 @@ public:
 	// expands the node given the policy. the q value must be updated using the update method.
 	// requires: the current node is a leaf. If it is terminal, no changes are made.
 	// policy is appropriately rotated if the player is black.
-	void expand(Position& p, Ndarray<float, 3> policy, const Move* moves, size_t size);
+	void expand(
+		Position& p,
+		Ndarray<float, 3>& policy,
+		const Move* moves,
+		size_t size,
+		vector<pair<Move, float>>& leaves
+	);
 
 	// returns the number of nodes currently under this tree.
 	size_t size();
@@ -174,7 +190,7 @@ public:
 
 	// returns the child with the highest upper bound according to the PUCT algorithm.
 	// if it has no children then null is returned.
-	std::pair<MCTSNode*, Move> select_best_child(const float cpuct);
+	void select_best_child(const float cpuct, std::pair<MCTSNode*, Move>& child);
 
 	// returns the child to play based on visit count with the given temperature parameter.
 	// if there are no children that are not leaves, nullptr is returned.
@@ -205,18 +221,20 @@ class MCTS {
 private:
 	MCTSNode* root;
 	MCTSNode* best_leaf;
-	MoveList<WHITE>* white_moves;
-	MoveList<BLACK>* black_moves;
+	Move* moves;
+	uint64_t nmoves;
 	vector<std::pair<MCTSNode*, Move>> best_leaf_path;
+	vector<pair<Move, float>> leaves;
 	Position p;
 	vector<Game> game_history;
 	bool auto_play;
 	uint32_t sims;
 	const float default_temp;
+	ofstream output;
 
 	// adds a move to the current game
 	// we want to pass by value bc board_state, p, m, c, are made on stack.
-	void add_move(BoardState board_state, Policy p, Move m, Color c);
+	void add_move(BoardState& board_state, Policy& p, Move& m, Color& c);
 
 	// declares a winner for the current game
 	void declare_winner(float c);
@@ -289,21 +307,31 @@ public:
 
 	// selects the best leaf thru MCTS and writes the position and the legal moves. Not threadsafe.
 	// Additionally, sets the best_leaf* to point to the selected node.
-	// if max sims is reached and auto play is off, this method does nothing (does not assign best_leaf, change position, etc...)
-	void select(const float cpuct, Ndarray<int, 2> board);
+	// if max sims is reached aNdarray<float, 3> DUMMY_POLICY;nd auto play is off, this method does nothing (does not assign best_leaf, change position, etc...)
+	void select(const float cpuct, Ndarray<int, 2>& board);
 
 	// expands the leaf node, backpropagates, plays the best move if necessary, resets the game if it's been terminated. Not threadsafe.
 	// also resets the selected leaf to null; select must be called again to select the best leaf.
 	// requires: select has been called.
-	void update(const float q, Ndarray<float, 3> policy);
+	void update(const float q, Ndarray<float, 3>& policy);
 
 	// auto-auto_play: whether to automatically play the next move when num_sims_to_play is reached
-	MCTS(const int num_sims_per_move, float t = 1.0, bool auto_play = true) :
+	MCTS(const int num_sims_per_move, float t = 1.0, bool auto_play = true, string output = "") :
 		root(new MCTSNode(WHITE)), best_leaf(nullptr), best_leaf_path(), p(),
 		sims(num_sims_per_move), game_history(1, Game()), temperature(t), default_temp(t),
-		auto_play(auto_play), white_moves(nullptr), black_moves(nullptr) {}
+		auto_play(auto_play), moves(new Move[MAX_MOVES]), nmoves(0), leaves(MAX_MOVES, pair<Move, float>(0, 0.0f))
+	{
+		if (!output.empty()) {
+			this->output.open(output);
+		}
+		best_leaf_path.reserve(200);
+	}
 
-	~MCTS() { if (root != nullptr) recursive_delete(*root, nullptr); }
+	~MCTS() { 
+		if (root != nullptr) 
+			recursive_delete(*root, nullptr);
+		output.close();
+	}
 
 	MCTS& operator=(MCTS other) = delete;
 	MCTS(const MCTS& other) = delete;

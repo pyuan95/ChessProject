@@ -39,13 +39,36 @@ void test_move_set() {
 	for (Move m : moves) {
 		stored_moves.insert(m.get_representation());
 	}
-	m.expand(p, DUMMY_POLICY, moves.begin(), moves.size());
+	std::vector<std::pair<Move, float>> leaves(218, pair<Move, float>(0, 0.0f));
+	Ndarray<float, 3> policy = Ndarray<float, 3>(
+		new float[ROWS * COLS * MOVES_PER_SQUARE](),
+		new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
+		new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
+	);
+
+	for (int i = 0; i < ROWS; i++) {
+		for (int j = 0; j < COLS; j++) {
+			for (int k = 0; k < MOVES_PER_SQUARE; k++) {
+				policy[i][j][k] = 10 * std::rand() / RAND_MAX;
+			}
+		}
+	}
+
+	m.expand(p, policy, moves.begin(), moves.size(), leaves);
 	assert(m.get_num_children() == moves.size());
 
+	uint8_t prev = 0xff;
+	float tot = 0;
 	for (int i = 0; i < m.get_num_children(); i++) {
 		Move stored(((uint16_t*)(m.begin_children() + i * 3L))[0]);
+		uint8_t prob((m.begin_children() + i * 3L)[2]);
+		assert(prev >= prob);
+		prev = prob;
+		// cout << (unsigned int) prev << "\t";
 		stored_moves.erase(stored.get_representation());
+		tot += (prev + 0.5f) / 256.0f;
 	}
+	// cout << tot;
 	assert(stored_moves.empty());
 }
 
@@ -388,57 +411,77 @@ void promotion_test() {
 	// std::cout << (m->turn() ? "BLACK" : "WHITE") << "'s minimax evaluation: " << m->minimax_evaluation() << "\n";
 	// assert(m->get_best_move(0.1).from() == b7); // assert that we found the move that leads to mate in 5.
 	delete m;
-
 }
 
 void memory_test() {
-	int SIMS = 1000000;
-	float CPUCT = 0.01f;
-	MCTS* m = new MCTS(1000000, 1.0, false);
-	Ndarray<float, 3> dummy_policy(
-		new float[ROWS * COLS * MOVES_PER_SQUARE],
-		new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
-		new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
-	);
-	for (int r = 0; r < ROWS; r++)
-	{
-		for (int c = 0; c < COLS; c++)
+	for (int abc = 0; abc < 3; abc++) {
+		int SIMS = 1000000;
+		float CPUCT = 0.01f;
+		MCTS* m = new MCTS(1000000, 1.0, false);
+		Ndarray<float, 3> dummy_policy(
+			new float[ROWS * COLS * MOVES_PER_SQUARE],
+			new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
+			new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
+		);
+		for (int r = 0; r < ROWS; r++)
 		{
-			for (int i = 0; i < MOVES_PER_SQUARE; i++)
-				dummy_policy[r][c][i] = 0.10f;
+			for (int c = 0; c < COLS; c++)
+			{
+				for (int i = 0; i < MOVES_PER_SQUARE; i++)
+					dummy_policy[r][c][i] = 0.10f;
+			}
 		}
-	}
 
-	Ndarray<int, 2> board(
-		new int[ROWS * COLS],
-		new long[2]{ ROWS, COLS },
-		new long[2]{ COLS, 1 }
-	);
+		Ndarray<int, 2> board(
+			new int[ROWS * COLS],
+			new long[2]{ ROWS, COLS },
+			new long[2]{ COLS, 1 }
+		);
 
-	while (m->current_sims() < SIMS) {
-		m->select(CPUCT, board);
-		m->update(0.00, dummy_policy);
-		if (m->current_sims() % 100000 == 0)
-			std::cout << "Current sims: " << m->current_sims() << "\n";
-	}
-	std::cout << "Size of MCTSNode: " << sizeof(MCTSNode) << "\n";
-	std::cout << "Number of nodes in MCTS Tree: " << m->size() << "\n";
-	std::cout << "Number of sims ran: " << m->current_sims() << "\n";
-	while (1) {
-		
+		while (m->current_sims() < SIMS) {
+			m->select(CPUCT, board);
+			m->update(0.00, dummy_policy);
+			if (m->current_sims() % 100000 == 0)
+				std::cout << "Current sims: " << m->current_sims() << "\n";
+		}
+		std::cout << "Size of MCTSNode: " << sizeof(MCTSNode) << "\n";
+		std::cout << "Number of nodes in MCTS Tree: " << m->size() << "\n";
+		std::cout << "Number of sims ran: " << m->current_sims() << "\n";
+
+		delete m;
 	}
 }
 
+void test_next_move_randomness() {
+	// IMPLEMENT ME
+}
+
+void test_updated_q() {
+	// IMPLEMENT ME!
+}
+
+void test_select_best_move_correctly() {
+	// IMPLEMENT ME
+}
+
+void test_select_random_move_correctly() {
+	// IMPLEMENT <E
+}
+
 void run_all_tests() {
-	print_test(&test_move_set, "test MCTSNode setting moves");
-	print_test(&testMCTSbitlogic, "MCTSNode bit logic test");
-	print_test(&test_prio_queue, "Priority Queue Test");
-	print_test(&rotation_test, "Rotation Test");
-	print_test(&policy_completeness_test, "Policy Completeness Test");
-	print_test(&policy_rotation_test, "Policy Rotation Test");
-	print_test(&select_and_update_no_errors, "Select and Update no Errors Test");
 	print_test(&select_best_move_test, "Select Best Move Test");
-	print_test(&autoplay_test, "Autoplay Test");
-	print_test(&promotion_test, "Promotion Test");
-	print_test(&memory_test, "Memory Test");
+
+	if (true) {
+		print_test(&test_move_set, "test MCTSNode setting moves");
+		print_test(&testMCTSbitlogic, "MCTSNode bit logic test");
+		print_test(&test_prio_queue, "Priority Queue Test");
+		print_test(&rotation_test, "Rotation Test");
+		print_test(&policy_completeness_test, "Policy Completeness Test");
+		print_test(&policy_rotation_test, "Policy Rotation Test");
+		print_test(&select_and_update_no_errors, "Select and Update no Errors Test");
+		print_test(&autoplay_test, "Autoplay Test");
+		print_test(&promotion_test, "Promotion Test");
+		print_test(&memory_test, "Memory Test");
+	}
+	
 }
