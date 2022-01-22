@@ -21,15 +21,36 @@ float rand_num(float s, float l) {
 
 // array must be initialized to all zeros
 template<Color color>
-void writeLegalMoves(const Position& p, Policy& policy) {
+void writeLegalMoves(Position& p, LegalMoves& legal_moves) {
 	MoveList<color> l(p);
-	if (l.size() == 0) // no moves available, this is a terminal position.
-		return false;
-
 	PolicyIndex i;
 	for (Move m : l) {
 		move2index(p, m, color, i);
-		policy.p[i.r][i.c][i.i] = 1;
+		legal_moves.l[i.r][i.c][i.i] = 1;
+	}
+}
+
+// writes a position to the given board.
+// 0...5 = our side (pawn, knight, bishop, rook, queen, king)
+// 8...13 = their side (pawn, knight, bishop, rook, queen, king)
+// 14 = empty
+template <Color color>
+void writePosition(const Position& p, int board[ROWS][COLS]) {
+	int piece;
+	for (int r = 0; r < ROWS; r++)
+	{
+		for (int c = 0; c < COLS; c++)
+		{
+			piece = p.at(create_square(File(c), Rank(r)));
+			if (color == BLACK) {
+				// invert and rotate
+				piece = invert(piece);
+				board[ROWS - r - 1][COLS - c - 1] = piece;
+			}
+			else {
+				board[r][c] = piece;
+			}
+		}
 	}
 }
 
@@ -51,24 +72,6 @@ void writePosition(const Position& p, Ndarray<int, 2>& board) {
 			else {
 				board[r][c] = piece;
 			}
-		}
-	}
-}
-
-template <Color color>
-void writePosition(const Position& p, int board[ROWS][COLS]) {
-	for (int r = 0; r < ROWS; r++)
-	{
-		for (int c = 0; c < COLS; c++)
-		{
-			int piece = p.at(create_square(File(c), Rank(r)));
-			if (color == BLACK) // invert and rotate
-			{
-				piece = invert(piece);
-				r = ROWS - r - 1;
-				c = COLS - c - 1;
-			}
-			board[r][c] = piece;
 		}
 	}
 }
@@ -169,7 +172,7 @@ vector<pair<Move, float>> MCTSNode::policy(float temperature)
 	float* s = calculate_policy(temperature);
 	vector<pair<Move, float>> policy;
 	for (int i = 0; i < num_expanded; i++)
-		policy.push_back(pair<Move, float>(get_move_at(i), s[i]));
+		policy.emplace_back(get_move_at(i), s[i]);
 	delete[] s;
 	return policy;
 }
@@ -246,42 +249,31 @@ void MCTSNode::backup(float q) {
 	this->q += q; 
 }
 
-void MCTS::add_move(BoardState& board_state, Policy& p, Move& m, Color& c) {
+void MCTS::add_move(BoardState& board_state, Policy& policy, LegalMoves& legal_moves, Move& m, Color& c) {
 	if (output.is_open()) {
 		output << board_state << "\n";
-		output << p << "\n";
+		for (int r = 0; r < ROWS; r++) {
+			for (int c = 0; c < COLS; c++) {
+				for (int i = 0; i < MOVES_PER_SQUARE; i++) {
+					if (legal_moves.l[r][c][i]) {
+						output << r << "," << c << "," << i << "," << policy.p[r][c][i] << ",";
+					}
+				}
+			}
+		}
 		output << m << "\n";
 		output << c << "\n";
+		output.flush();
 	}
+	move_num++;
 }
 
-void MCTS::declare_winner(float c)
-{
+void MCTS::declare_winner(float c) {
 	long res = std::lround(c);
-	output << res << "\n";
-}
-
-size_t MCTS::move_num() {
-	return game_history.back().board_history.size() + 1; // when there are 0 elements on the stack we are on move number 1.
-}
-
-size_t MCTSNode::size() {
-	size_t tot = 1 + num_children - num_expanded;
-	for (int i = 0; i < num_expanded; i++)
-		tot += get_node_at(i).size();
-	return tot;
-}
-
-void MCTS::serialize_games(string name)
-{
-	ofstream out(name);
-	for (Game g : game_history)
-	{
-		for (Move m : g.move_history)
-			out << m << " ";
-		out << "\n";
+	if (output.is_open()) {
+		output << res << " WINNER!\n";
+		output.flush();
 	}
-	out.close();
 }
 
 void MCTS::new_game() {
@@ -294,10 +286,30 @@ void MCTS::new_game() {
 	best_leaf_path.reserve(200);
 	p = Position();
 	temperature = default_temp;
-	game_history.push_back(Game());
+	game_num++;
+	move_num = 1;
+	if (output.is_open()) {
+		output << "\n";
+		output.flush();
+	}
 }
 
-void MCTS::select(const float cpuct, Ndarray<int, 2>& board) {
+int MCTS::move_number() {
+	return move_num;
+}
+
+int MCTS::game_number() {
+	return game_num;
+}
+
+size_t MCTSNode::size() {
+	size_t tot = 1 + num_children - num_expanded;
+	for (int i = 0; i < num_expanded; i++)
+		tot += get_node_at(i).size();
+	return tot;
+}
+
+void MCTS::select(const float cpuct, Ndarray<int, 2> board) {
 	while ((root->get_num_times_selected() < sims || auto_play) && select_helper(cpuct, board)) {
 		// select helper returned true. means p is at a terminal position now.
 		float q = evaluateTerminalPosition(p);
@@ -309,7 +321,7 @@ void MCTS::select(const float cpuct, Ndarray<int, 2>& board) {
 
 bool MCTS::select_helper(const float cpuct, Ndarray<int, 2>& board) {
 	MCTSNode* cur = root;
-	best_leaf_path.push_back(std::pair<MCTSNode*, Move>(cur, 0));
+	best_leaf_path.emplace_back(cur, 0);
 	std::pair<MCTSNode*, Move> child(0, 0);
 	while (!(cur->is_leaf())) {
 		cur->select_best_child(cpuct, child);
@@ -317,7 +329,7 @@ bool MCTS::select_helper(const float cpuct, Ndarray<int, 2>& board) {
 			p.play<WHITE>(child.second);
 		else
 			p.play<BLACK>(child.second);
-		best_leaf_path.push_back(std::pair<MCTSNode*, Move>(child.first, child.second));
+		best_leaf_path.emplace_back(child.first, child.second);
 
 		cur = child.first;
 	}
@@ -358,7 +370,7 @@ bool MCTS::select_helper(const float cpuct, Ndarray<int, 2>& board) {
 	}
 }
 
-void MCTS::update(const float q, Ndarray<float, 3>& policy)
+void MCTS::update(const float q, Ndarray<float, 3> policy)
 {
 	if (root->get_num_times_selected() >= sims && !auto_play) {
 		// over the max sims and no auto-play; simply exit. but we need to maintain our invariants.
@@ -411,6 +423,13 @@ void MCTS::update(const float q, Ndarray<float, 3>& policy)
 			policy.p[pidx.r][pidx.c][pidx.i] = prob;
 		}
 
+		// write the legal moves;
+		LegalMoves legal_moves;
+		if (root->get_color() == WHITE)
+			writeLegalMoves<WHITE>(p, legal_moves);
+		else
+			writeLegalMoves<BLACK>(p, legal_moves);
+
 		// now, write the board state.
 		BoardState board_state;
 		if (root->get_color() == WHITE)
@@ -432,7 +451,7 @@ void MCTS::update(const float q, Ndarray<float, 3>& policy)
 		root = newRoot;
 
 		// add the move to the game.
-		add_move(board_state, policy, m, root_color);
+		add_move(board_state, policy, legal_moves, m, root_color);
 
 		// check to see if the game is over. if so, declare a winner and start a new game.
 		root_color = root->get_color();
@@ -460,6 +479,18 @@ ostream& operator<<(ostream& os, const Policy& p) {
 		for (int j = 0; j < COLS; j++) {
 			for (int k = 0; k < MOVES_PER_SQUARE; k++) {
 				os << std::to_string(p.p[i][j][k]);
+				os << ",";
+			}
+		}
+	}
+	return os;
+}
+
+ostream& operator<<(ostream& os, const LegalMoves& l) {
+	for (int i = 0; i < ROWS; i++) {
+		for (int j = 0; j < COLS; j++) {
+			for (int k = 0; k < MOVES_PER_SQUARE; k++) {
+				os << std::to_string(l.l[i][j][k]);
 				os << ",";
 			}
 		}

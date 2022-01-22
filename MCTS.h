@@ -1,7 +1,6 @@
 #pragma once
 #include <vector>
 #include <algorithm>
-// #include <math.h>
 #include <random>
 #include <ctime>
 #include <cmath>
@@ -23,9 +22,13 @@ struct PolicyIndex {
 	PolicyIndex() {}
 };
 
+struct LegalMoves {
+	int l[ROWS][COLS][MOVES_PER_SQUARE] = { 0 };
+};
+
 // wrapper class for the policy array; we can't directly store arrays in a vector.
 struct Policy {
-	float p[ROWS][COLS][MOVES_PER_SQUARE] = { 0 };
+	float p[ROWS][COLS][MOVES_PER_SQUARE] = { 0.0f };
 };
 
 // wrapper class for the board state; we can't directly store arrays in a vector.
@@ -36,6 +39,8 @@ struct BoardState {
 extern ostream& operator<<(ostream& os, const Policy& p);
 
 extern ostream& operator<<(ostream& os, const BoardState& b);
+
+extern ostream& operator<<(ostream& os, const LegalMoves& l);
 
 // each MCTS object will contain a member of vector<Game>, which it will use to store completed games.
 struct Game {
@@ -226,15 +231,16 @@ private:
 	vector<std::pair<MCTSNode*, Move>> best_leaf_path;
 	vector<pair<Move, float>> leaves;
 	Position p;
-	vector<Game> game_history;
 	bool auto_play;
 	uint32_t sims;
 	const float default_temp;
 	ofstream output;
+	int move_num;
+	int game_num;
 
 	// adds a move to the current game
 	// we want to pass by value bc board_state, p, m, c, are made on stack.
-	void add_move(BoardState& board_state, Policy& p, Move& m, Color& c);
+	void add_move(BoardState& board_state, Policy& p, LegalMoves& legal_moves, Move& m, Color& c);
 
 	// declares a winner for the current game
 	void declare_winner(float c);
@@ -295,31 +301,28 @@ public:
 	// returns the number of nodes in this tree.
 	inline size_t size() { return root->size(); }
 
-	// returns the game history, including the game currently in progress.
-	inline const vector<Game>& games() { return game_history; }
+	// the move number that the current game is on. starts at 1.
+	int move_number();
 
-	// save the game data into a file with the given prefix
-	void serialize_games(string name);
-
-	// the move number that the current game is on.
-	// may be used to set the temperature (in the paper, tmeperature goes from 1 -> close to 0 after move 30).
-	size_t move_num();
+	// the game number we are on. starts at 1.
+	int game_number();
 
 	// selects the best leaf thru MCTS and writes the position and the legal moves. Not threadsafe.
 	// Additionally, sets the best_leaf* to point to the selected node.
 	// if max sims is reached aNdarray<float, 3> DUMMY_POLICY;nd auto play is off, this method does nothing (does not assign best_leaf, change position, etc...)
-	void select(const float cpuct, Ndarray<int, 2>& board);
+	void select(const float cpuct, Ndarray<int, 2> board);
 
 	// expands the leaf node, backpropagates, plays the best move if necessary, resets the game if it's been terminated. Not threadsafe.
 	// also resets the selected leaf to null; select must be called again to select the best leaf.
 	// requires: select has been called.
-	void update(const float q, Ndarray<float, 3>& policy);
+	void update(const float q, Ndarray<float, 3> policy);
 
 	// auto-auto_play: whether to automatically play the next move when num_sims_to_play is reached
 	MCTS(const int num_sims_per_move, float t = 1.0, bool auto_play = true, string output = "") :
 		root(new MCTSNode(WHITE)), best_leaf(nullptr), best_leaf_path(), p(),
-		sims(num_sims_per_move), game_history(1, Game()), temperature(t), default_temp(t),
-		auto_play(auto_play), moves(new Move[MAX_MOVES]), nmoves(0), leaves(MAX_MOVES, pair<Move, float>(0, 0.0f))
+		sims(num_sims_per_move), temperature(t), default_temp(t),
+		auto_play(auto_play), moves(new Move[MAX_MOVES]), nmoves(0), leaves(MAX_MOVES, pair<Move, float>(0, 0.0f)),
+		move_num(1), game_num(1)
 	{
 		if (!output.empty()) {
 			this->output.open(output);
@@ -330,10 +333,33 @@ public:
 	~MCTS() { 
 		if (root != nullptr) 
 			recursive_delete(*root, nullptr);
+		if (moves != nullptr)
+			delete[] moves;
 		output.close();
 	}
 
 	MCTS& operator=(MCTS other) = delete;
 	MCTS(const MCTS& other) = delete;
+
+	// because msvc compiler sucks, we have to make this ourselves.
+	MCTS(MCTS&& other) noexcept :
+		root(other.root),
+		best_leaf(other.best_leaf),
+		moves(other.moves),
+		nmoves(other.nmoves),
+		best_leaf_path(std::move(other.best_leaf_path)),
+		leaves(std::move(other.leaves)),
+		p(std::move(other.p)),
+		auto_play(other.auto_play),
+		sims(other.sims),
+		default_temp(other.default_temp),
+		output(std::move(other.output)),
+		move_num(other.move_num),
+		game_num(other.game_num),
+		temperature(other.temperature)
+	{
+		other.root = nullptr;
+		other.moves = nullptr;
+	}
 };
 

@@ -4,7 +4,7 @@
 #include <algorithm>
 #include "PriorityQueue.h"
 #include <unordered_set>
-
+#include "BatchMCTS.h"
 template<Color color>
 static bool writeLegalMoves(Position& p, int moves[ROWS][COLS][MOVES_PER_SQUARE], bool fillzeros) {
 	MoveList<color> l(p);
@@ -49,7 +49,7 @@ void test_move_set() {
 	for (int i = 0; i < ROWS; i++) {
 		for (int j = 0; j < COLS; j++) {
 			for (int k = 0; k < MOVES_PER_SQUARE; k++) {
-				policy[i][j][k] = 10 * std::rand() / RAND_MAX;
+				policy[i][j][k] = 10.0f * std::rand() / RAND_MAX;
 			}
 		}
 	}
@@ -255,7 +255,7 @@ void select_and_update_no_errors() {
 		// std::cout << "position: " << m->position() << "\n";
 	}
 	assert(!m->reached_sim_limit());
-	assert(m->move_num() == 1);
+	assert(m->move_number() == 1);
 	assert(m->current_sims() >= 1000);
 	assert(m->position() == p1);
 
@@ -265,7 +265,7 @@ void select_and_update_no_errors() {
 		m->update(0.0, dummy_policy);
 	}
 	assert(m->reached_sim_limit());
-	assert(m->move_num() == 1);
+	assert(m->move_number() == 1);
 	assert(m->current_sims() == 10000);
 	assert(m->position() == p1);
 	delete m;
@@ -355,10 +355,9 @@ void autoplay_test() {
 		}
 		// cout << m->current_sims() << "\n";
 	}
-	assert(m->move_num() > 995 || m->games().size() > 0);
-	cout << "number of games: " << m->games().size() << "\n";
-	cout << "move num in current game: " << m->move_num() << "\n";
-	m->serialize_games("C://Users//patri//Desktop//Chess Project//Chess Project//Chess Project//SavedGames//games.txt");
+	assert(m->move_number() > 995 || m->game_number() > 1);
+	cout << "number of games: " << m->game_number() << "\n";
+	cout << "move num in current game: " << m->move_number() << "\n";
 	delete m;
 }
 
@@ -453,25 +452,230 @@ void memory_test() {
 }
 
 void test_next_move_randomness() {
-	// IMPLEMENT ME
+	int SIMS = 100000;
+	float CPUCT = 0.01f;
+	MCTS* m = new MCTS(1000000, 1.0, false);
+	Ndarray<float, 3> dummy_policy(
+		new float[ROWS * COLS * MOVES_PER_SQUARE],
+		new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
+		new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
+	);
+	for (int r = 0; r < ROWS; r++)
+	{
+		for (int c = 0; c < COLS; c++)
+		{
+			for (int i = 0; i < MOVES_PER_SQUARE; i++)
+				dummy_policy[r][c][i] = 0.10f;
+		}
+	}
+
+	Ndarray<int, 2> board(
+		new int[ROWS * COLS],
+		new long[2]{ ROWS, COLS },
+		new long[2]{ COLS, 1 }
+	);
+
+	while (m->current_sims() < SIMS) {
+		m->select(CPUCT, board);
+		m->update(0.00f, dummy_policy);
+	}
+
+	unordered_set<uint16_t> captured_moves;
+	for (unsigned int i = 0; i < 1000000; i++) {
+		captured_moves.insert(m->get_best_move(1.0).get_representation());
+	}
+	Position pos;
+	assert(captured_moves.size() == MoveList<WHITE>(pos).size());
+	delete m;
 }
 
 void test_updated_q() {
-	// IMPLEMENT ME!
+	int SIMS = 1000000;
+	float CPUCT = 0.01f;
+	MCTS* m = new MCTS(1000000, 1.0, false);
+	Ndarray<float, 3> dummy_policy(
+		new float[ROWS * COLS * MOVES_PER_SQUARE],
+		new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
+		new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
+	);
+	Ndarray<int, 2> board(
+		new int[ROWS * COLS],
+		new long[2]{ ROWS, COLS },
+		new long[2]{ COLS, 1 }
+	);
+	for (int r = 0; r < ROWS; r++)
+	{
+		for (int c = 0; c < COLS; c++)
+		{
+			for (int i = 0; i < MOVES_PER_SQUARE; i++)
+				dummy_policy[r][c][i] = 0.10f;
+		}
+	}
+
+	m->select(1, board);
+	m->update(150, dummy_policy);
+	m->select(0, board);
+	m->update(-2.5, dummy_policy);
+	assert(std::abs(m->evaluation() - ((150.0f + 2.5f) / 2.0f)) < 0.001);
+	assert(std::abs(m->minimax_evaluation() - 2.5f) < 0.001);
+	delete m;
 }
 
 void test_select_best_move_correctly() {
-	// IMPLEMENT ME
+	MCTSNode m(WHITE);
+	Position p;
+	MoveList<WHITE> moves(p);
+
+	std::vector<std::pair<Move, float>> leaves(218, pair<Move, float>(0, 0.0f));
+	Ndarray<float, 3> policy = Ndarray<float, 3>(
+		new float[ROWS * COLS * MOVES_PER_SQUARE](),
+		new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
+		new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
+	);
+
+	for (int i = 0; i < ROWS; i++) {
+		for (int j = 0; j < COLS; j++) {
+			for (int k = 0; k < MOVES_PER_SQUARE; k++) {
+				policy[i][j][k] = 10.0f * std::rand() / RAND_MAX;
+			}
+		}
+	}
+
+	m.expand(p, policy, moves.begin(), moves.size(), leaves);
+	std::pair<MCTSNode*, Move> child(0, 0);
+	m.select_best_child(0.01f, child);
+	child.first->backup(-100.0f); // really good for us now
+	MCTSNode* prev_best = child.first;
+	m.select_best_child(0.01f, child);
+	assert(child.first == prev_best);
+
+	child.first->backup(1000); // now really bad for us; next node should be a new one;
+	prev_best = child.first;
+	m.select_best_child(0.01f, child);
+	assert(child.first == ((MCTSNode*) m.begin_nodes()) + 1);
+
+	child.first->backup(1000); // now really bad for us; next node should be a new one;
+	prev_best = child.first;
+	m.select_best_child(0.01f, child);
+	assert(child.first == ((MCTSNode*)m.begin_nodes()) + 2);
+
+	child.first->backup(-1000); // now really good for us; next node should be the same one;
+	prev_best = child.first;
+	m.select_best_child(0.01f, child);
+	m.select_best_child(0.01f, child);
+	m.select_best_child(0.01f, child);
+	assert(child.first == prev_best);
 }
 
-void test_select_random_move_correctly() {
-	// IMPLEMENT <E
+void batch_mcts_test() {
+	int iterations = 1000;
+	int num_sims_per_move = 1000;
+	float temperature = 1.0;
+	bool autoplay = true;
+	string output = "C:\\Users\\patri\\Desktop\\Chess Project\\Chess Project\\Chess Project\\SavedGames\\output";
+	output = "";
+
+	int num_threads = 4;
+	int batch_size = 1000;
+	int num_sectors = 1;
+	float cpuct = 1.0;
+
+	Ndarray<int, 3> boards(
+		new int[batch_size * num_sectors * ROWS * COLS],
+		new long[3]{ batch_size * num_sectors, ROWS, COLS },
+		new long[3]{ ROWS * COLS, COLS, 1 }
+	);
+
+	Ndarray<float, 4> policy(
+		new float[batch_size * ROWS * COLS * MOVES_PER_SQUARE](),
+		new long[4]{ batch_size, ROWS, COLS, MOVES_PER_SQUARE },
+		new long[4]{ ROWS * COLS * MOVES_PER_SQUARE, COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
+	);
+
+	Ndarray<float, 1> q(
+		new float[batch_size],
+		new long[1]{ batch_size },
+		new long[1]{ batch_size }
+	);
+
+	for (int a = 0; a < batch_size; a++) {
+		for (int i = 0; i < ROWS; i++) {
+			for (int j = 0; j < COLS; j++) {
+				for (int k = 0; k < MOVES_PER_SQUARE; k++) {
+					policy[a][i][j][k] = 10.0f * std::rand() / RAND_MAX;
+				}
+			}
+		}
+	}
+
+	BatchMCTS m(
+		num_sims_per_move, temperature, autoplay, output, num_threads, batch_size, num_sectors, cpuct, boards
+	);
+
+	using namespace std;
+	using namespace std::chrono;
+	auto start = high_resolution_clock::now();
+	for (int i = 0; i < iterations; i++) {
+		// std::cout << i << "\n";
+		m.select();
+		m.update(q, policy);
+		if (i % 100 == 0)
+			std::cout << i << "\n";
+	}
+	auto stop = high_resolution_clock::now();
+	auto duration = duration_cast<milliseconds>(stop - start);
+	cout << "speed: " << iterations * batch_size * 1000.0 / duration.count() << " sims per second\n";
+	cout << "speed: " << iterations * batch_size * 1000.0 / duration.count() / num_threads << " sims per second per thread\n";
+}
+
+void test_ndarray_copy() {
+	int batch_size = 100;
+
+	Ndarray<float, 4> policy(
+		new float[batch_size * ROWS * COLS * MOVES_PER_SQUARE](),
+		new long[4]{ batch_size, ROWS, COLS, MOVES_PER_SQUARE },
+		new long[4]{ ROWS * COLS * MOVES_PER_SQUARE, COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
+	);
+
+	Ndarray<float, 4> policy2(
+		new float[batch_size * ROWS * COLS * MOVES_PER_SQUARE](),
+		new long[4]{ batch_size, ROWS, COLS, MOVES_PER_SQUARE },
+		new long[4]{ ROWS * COLS * MOVES_PER_SQUARE, COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
+	);
+
+	for (int a = 0; a < batch_size; a++) {
+		for (int i = 0; i < ROWS; i++) {
+			for (int j = 0; j < COLS; j++) {
+				for (int k = 0; k < MOVES_PER_SQUARE; k++) {
+					policy[a][i][j][k] = 10.0f * std::rand() / RAND_MAX;
+				}
+			}
+		}
+	}
+
+	policy2.copy(policy);
+
+	for (int a = 0; a < batch_size; a++) {
+		for (int i = 0; i < ROWS; i++) {
+			for (int j = 0; j < COLS; j++) {
+				for (int k = 0; k < MOVES_PER_SQUARE; k++) {
+					assert(policy[a][i][j][k] == policy2[a][i][j][k]);
+				}
+			}
+		}
+	}
 }
 
 void run_all_tests() {
-	print_test(&select_best_move_test, "Select Best Move Test");
-
-	if (true) {
+	print_test(&batch_mcts_test, "batch mcts");
+	if (false) {
+		print_test(&promotion_test, "Promotion Test");
+		print_test(&test_ndarray_copy, "test ndarray copy");
+		print_test(&autoplay_test, "Autoplay Test");
+		print_test(&test_select_best_move_correctly, "MCTSNode select best child test");
+		print_test(&test_next_move_randomness, "text next move randomness test");
+		print_test(&test_updated_q, "updated q test");
+		print_test(&select_best_move_test, "Select Best Move Test");
 		print_test(&test_move_set, "test MCTSNode setting moves");
 		print_test(&testMCTSbitlogic, "MCTSNode bit logic test");
 		print_test(&test_prio_queue, "Priority Queue Test");
@@ -479,9 +683,6 @@ void run_all_tests() {
 		print_test(&policy_completeness_test, "Policy Completeness Test");
 		print_test(&policy_rotation_test, "Policy Rotation Test");
 		print_test(&select_and_update_no_errors, "Select and Update no Errors Test");
-		print_test(&autoplay_test, "Autoplay Test");
-		print_test(&promotion_test, "Promotion Test");
 		print_test(&memory_test, "Memory Test");
 	}
-	
 }

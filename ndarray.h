@@ -57,6 +57,7 @@ public:
     Ndarray(const Ndarray<datatype, ndim>& array);
     Ndarray(const numpyArray<datatype>& array);
     long getShape(const int axis);
+    void copy(Ndarray<datatype, ndim> other);
     typename getItemTraits<datatype, ndim>::returnType operator[](unsigned long i);
 };
 
@@ -101,7 +102,12 @@ long Ndarray<datatype, ndim>::getShape(const int axis)
     return this->shape[axis];
 }
 
-
+template<typename datatype, int ndim>
+inline void Ndarray<datatype, ndim>::copy(Ndarray<datatype, ndim> other)
+{
+    size_t size = this->strides[0] * this->shape[0];
+    memcpy(this->data, other.data, sizeof(datatype) * size);
+}
 
 // Ndarray overloaded []-operator.
 // The [i][j][k] selection is recursively replaced by i*strides[0]+j*strides[1]+k*strides[2]
@@ -114,8 +120,6 @@ Ndarray<datatype, ndim>::operator[](unsigned long i)
 {
     return Ndarray<datatype, ndim - 1>(&this->data[i * this->strides[0]], &this->shape[1], &this->strides[1]);
 }
-
-
 
 // Template partial specialisation of Ndarray.
 // For 1D Ndarrays, the [] operator should return an element, not a subarray, so it needs
@@ -162,8 +166,6 @@ Ndarray<datatype, 1>::Ndarray(const Ndarray<datatype, 1>& array)
     this->strides = array.strides;
 }
 
-
-
 // Ndarray partially specialised constructor from ctypes structure
 
 template<typename datatype>
@@ -174,8 +176,6 @@ Ndarray<datatype, 1>::Ndarray(const numpyArray<datatype>& array)
     this->strides = array.strides;
 }
 
-
-
 // Ndarray method to get length of given axis
 
 template<typename datatype>
@@ -184,8 +184,6 @@ long Ndarray<datatype, 1>::getShape(const int axis)
     return this->shape[axis];
 }
 
-
-
 // Partial specialised [] operator: for 1D arrays, return an element rather than a subarray 
 
 template<typename datatype>
@@ -193,6 +191,30 @@ typename getItemTraits<datatype, 1>::returnType
 Ndarray<datatype, 1>::operator[](unsigned long i)
 {
     return this->data[i * this->strides[0]];
+}
+
+template<typename datatype>
+inline std::ostream& operator<<(std::ostream& out, Ndarray<datatype, 1> arr) {
+    out << "[";
+    for (int i = 0; i < arr.getShape(0); i++) {
+        out << arr[i];
+        if (i < arr.getShape(0) - 1)
+            out << ", ";
+    }
+    out << "]";
+    return out;
+}
+
+template<typename datatype, int ndim>
+inline std::ostream& operator<<(std::ostream& out, Ndarray<datatype, ndim> arr) {
+    out << "[";
+    for (int i = 0; i < arr.getShape(0); i++) {
+        out << arr[i];
+        if (i < arr.getShape(0) - 1)
+            out << "\n";
+    }
+    out << "]";
+    return out;
 }
 
 #endif

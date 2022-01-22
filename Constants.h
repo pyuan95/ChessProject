@@ -6,6 +6,7 @@
 
 extern int move2index_initializer(PieceType pt, Move m, Color color);
 
+const int DRAWING_MOVE_COUNT = 50;
 const int MAX_MOVES = 218;
 const int MOVES_PER_SQUARE = 73;
 const float EPSILON = pow(10.0f, -20.0f);

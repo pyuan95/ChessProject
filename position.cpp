@@ -35,7 +35,7 @@ std::ostream& operator<< (std::ostream& os, const Position& p) {
 }
 
 std::string Position::start_pos = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -";
-int Position::max_moves_without_pawn_move_or_captures = 50;
+int Position::max_moves_without_pawn_move_or_captures = 30;
 
 //Returns the FEN (Forsyth-Edwards Notation) representation of the position
 std::string Position::fen() const {
