@@ -5,6 +5,7 @@
 #include "PriorityQueue.h"
 #include <unordered_set>
 #include "BatchMCTS.h"
+
 template<Color color>
 static bool writeLegalMoves(Position& p, int moves[ROWS][COLS][MOVES_PER_SQUARE], bool fillzeros) {
 	MoveList<color> l(p);
@@ -115,6 +116,7 @@ void print_test(void (*func)(), string name)
 	cout << "running test: " << name << " completed\n\n";
 }
 
+/*
 void rotation_test() {
 	Position p1;
 	Position p2;
@@ -135,6 +137,7 @@ void rotation_test() {
 	for (int i = 0; i < 64; i++)
 		assert(board1[i >> 3][i & 8] == board2[i >> 3][i & 8]);
 }
+*/
 
 void policy_rotation_test() {
 	Position p1;
@@ -572,12 +575,12 @@ void batch_mcts_test() {
 	int num_sims_per_move = 1000;
 	float temperature = 1.0;
 	bool autoplay = true;
-	string output = "C:\\Users\\patri\\Desktop\\Chess Project\\Chess Project\\Chess Project\\SavedGames\\output";
+	string output = "./output/output";
 	output = "";
 
-	int num_threads = 4;
-	int batch_size = 1000;
-	int num_sectors = 1;
+	int num_threads = 12;
+	int batch_size = 5000;
+	int num_sectors = 2;
 	float cpuct = 1.0;
 
 	Ndarray<int, 3> boards(
@@ -679,7 +682,7 @@ void run_all_tests() {
 		print_test(&test_move_set, "test MCTSNode setting moves");
 		print_test(&testMCTSbitlogic, "MCTSNode bit logic test");
 		print_test(&test_prio_queue, "Priority Queue Test");
-		print_test(&rotation_test, "Rotation Test");
+		// print_test(&rotation_test, "Rotation Test");
 		print_test(&policy_completeness_test, "Policy Completeness Test");
 		print_test(&policy_rotation_test, "Policy Rotation Test");
 		print_test(&select_and_update_no_errors, "Select and Update no Errors Test");

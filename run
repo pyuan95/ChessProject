@@ -1,0 +1,3 @@
+clear
+g++ -std=c++17 -Ofast BatchMCTS.cpp Constants.cpp main.cpp MCTS.cpp position.cpp tables.cpp tests.cpp types.cpp -o ./output/main.o -pthread
+./output/main.o

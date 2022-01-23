@@ -9,7 +9,7 @@
 #include "Constants.h"
 #include "position.h"
 #include "tables.h"
-
+#include "float.h"
 using namespace std;
 
 // stores the indices in the policy array
@@ -51,18 +51,60 @@ struct Game {
 	float winner = 2; // -1 for black, 0 for draw, 1 for white, 2 for in progress.
 };
 
-// initializes the random seed with the current time.
-void init_rand();
+inline int invert(int piece) {
+	if (piece <= 5)
+		return piece + 8;
+	else if (piece <= 13)
+		return piece - 8;
+	return 14;
+}
 
-// including these in the header files for testing purposes.
+// writes a position to the given board.
+// 0...5 = our side (pawn, knight, bishop, rook, queen, king)
+// 8...13 = their side (pawn, knight, bishop, rook, queen, king)
+// 14 = empty
+template<Color color>
+inline void writePosition(const Position& p, Ndarray<int, 2>& board) {
+	int piece;
+	for (int r = 0; r < ROWS; r++) {
+		for (int c = 0; c < COLS; c++) {
+			piece = p.at(create_square(File(c), Rank(r)));
+			if (color == BLACK) {
+				// invert and rotate
+				piece = invert(piece);
+				board[ROWS - r - 1][COLS - c - 1] = piece;
+			}
+			else {
+				board[r][c] = piece;
+			}
+		}
+	}
+}
 
 template<Color color>
-void writePosition(const Position& p, Ndarray<int, 2>& board);
-
-template<Color color>
-void writePosition(const Position& p, int board[ROWS][COLS]);
+inline void writePosition(const Position& p, int board[ROWS][COLS]) {
+	int piece;
+	for (int r = 0; r < ROWS; r++)
+	{
+		for (int c = 0; c < COLS; c++)
+		{
+			piece = p.at(create_square(File(c), Rank(r)));
+			if (color == BLACK) {
+				// invert and rotate
+				piece = invert(piece);
+				board[ROWS - r - 1][COLS - c - 1] = piece;
+			}
+			else {
+				board[r][c] = piece;
+			}
+		}
+	}
+}
 
 void move2index(const Position& p, Move m, Color color, PolicyIndex& policyIndex);
+
+// initializes the random seed with the current time.
+void init_rand();
 
 /*
 The class that represents a node in the MCTS Tree

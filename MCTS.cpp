@@ -4,15 +4,6 @@ bool compare_leaf(pair<Move, float> x, pair<Move, float> y) {
 	return x.second > y.second; // sort decreasing by probability
 }
 
-int invert(int piece)
-{
-	if (piece <= 5)
-		return piece + 8;
-	else if (piece <= 13)
-		return piece - 8;
-	return 14;
-}
-
 float rand_num(float s, float l) {
 	float f = std::rand() / (RAND_MAX + EPSILON); // unif(0,1)
 	f = f * (l - s) + s;
@@ -27,52 +18,6 @@ void writeLegalMoves(Position& p, LegalMoves& legal_moves) {
 	for (Move m : l) {
 		move2index(p, m, color, i);
 		legal_moves.l[i.r][i.c][i.i] = 1;
-	}
-}
-
-// writes a position to the given board.
-// 0...5 = our side (pawn, knight, bishop, rook, queen, king)
-// 8...13 = their side (pawn, knight, bishop, rook, queen, king)
-// 14 = empty
-template <Color color>
-void writePosition(const Position& p, int board[ROWS][COLS]) {
-	int piece;
-	for (int r = 0; r < ROWS; r++)
-	{
-		for (int c = 0; c < COLS; c++)
-		{
-			piece = p.at(create_square(File(c), Rank(r)));
-			if (color == BLACK) {
-				// invert and rotate
-				piece = invert(piece);
-				board[ROWS - r - 1][COLS - c - 1] = piece;
-			}
-			else {
-				board[r][c] = piece;
-			}
-		}
-	}
-}
-
-// writes a position to the given board.
-// 0...5 = our side (pawn, knight, bishop, rook, queen, king)
-// 8...13 = their side (pawn, knight, bishop, rook, queen, king)
-// 14 = empty
-template <Color color>
-void writePosition(const Position& p, Ndarray<int, 2>& board) {
-	int piece;
-	for (int r = 0; r < ROWS; r++) {
-		for (int c = 0; c < COLS; c++) {
-			piece = p.at(create_square(File(c), Rank(r)));
-			if (color == BLACK) {
-				// invert and rotate
-				piece = invert(piece);
-				board[ROWS - r - 1][COLS - c - 1] = piece;
-			}
-			else {
-				board[r][c] = piece;
-			}
-		}
 	}
 }
 

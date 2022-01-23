@@ -157,7 +157,7 @@ void initialise_rook_attacks() {
 }
 
 //Returns the attacks bitboard for a rook at a given square, using the magic lookup table
-constexpr Bitboard get_rook_attacks(Square square, Bitboard occ) {
+Bitboard get_rook_attacks(Square square, Bitboard occ) {
 	return ROOK_ATTACKS[square][((occ & ROOK_ATTACK_MASKS[square]) * ROOK_MAGICS[square])
 		>> ROOK_ATTACK_SHIFTS[square]];
 }
@@ -223,7 +223,7 @@ void initialise_bishop_attacks() {
 }
 
 //Returns the attacks bitboard for a bishop at a given square, using the magic lookup table
-constexpr Bitboard get_bishop_attacks(Square square, Bitboard occ) {
+Bitboard get_bishop_attacks(Square square, Bitboard occ) {
 	return BISHOP_ATTACKS[square][((occ & BISHOP_ATTACK_MASKS[square]) * BISHOP_MAGICS[square])
 		>> BISHOP_ATTACK_SHIFTS[square]];
 }
@@ -281,10 +281,10 @@ Bitboard PSEUDO_LEGAL_ATTACKS[NPIECE_TYPES][NSQUARES];
 //Initializes the table containg pseudolegal attacks of each piece for each square. This does not include blockers
 //for sliding pieces
 void initialise_pseudo_legal() {
-	memcpy(PAWN_ATTACKS[WHITE], WHITE_PAWN_ATTACKS, sizeof(WHITE_PAWN_ATTACKS));
-	memcpy(PAWN_ATTACKS[BLACK], BLACK_PAWN_ATTACKS, sizeof(BLACK_PAWN_ATTACKS));
-	memcpy(PSEUDO_LEGAL_ATTACKS[KNIGHT], KNIGHT_ATTACKS, sizeof(KNIGHT_ATTACKS));
-	memcpy(PSEUDO_LEGAL_ATTACKS[KING], KING_ATTACKS, sizeof(KING_ATTACKS));
+	std::memcpy(PAWN_ATTACKS[WHITE], WHITE_PAWN_ATTACKS, sizeof(WHITE_PAWN_ATTACKS));
+	std::memcpy(PAWN_ATTACKS[BLACK], BLACK_PAWN_ATTACKS, sizeof(BLACK_PAWN_ATTACKS));
+	std::memcpy(PSEUDO_LEGAL_ATTACKS[KNIGHT], KNIGHT_ATTACKS, sizeof(KNIGHT_ATTACKS));
+	std::memcpy(PSEUDO_LEGAL_ATTACKS[KING], KING_ATTACKS, sizeof(KING_ATTACKS));
 	for (Square s = a1; s <= h8; ++s) {
 		PSEUDO_LEGAL_ATTACKS[ROOK][s] = get_rook_attacks_for_init(s, 0);
 		PSEUDO_LEGAL_ATTACKS[BISHOP][s] = get_bishop_attacks_for_init(s, 0);

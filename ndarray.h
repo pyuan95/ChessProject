@@ -7,7 +7,7 @@
 
 #ifndef NDARRAY_H
 #define NDARRAY_H
-
+#include <cstring>
 
 
 // The C-struct to retrieve the ctypes structure.

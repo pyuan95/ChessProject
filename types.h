@@ -102,13 +102,39 @@ extern const Bitboard k2;
 extern const Bitboard k4;
 extern const Bitboard kf;
 
-extern inline int pop_count(Bitboard x);
-extern inline int sparse_pop_count(Bitboard x);
-extern inline Square pop_lsb(Bitboard* b);
-
 extern const int DEBRUIJN64[64];
 extern const Bitboard MAGIC;
-extern constexpr Square bsf(Bitboard b);
+
+//Returns the index of the least significant bit in the bitboard
+extern inline const Square bsf(Bitboard b) {
+	return Square(DEBRUIJN64[MAGIC * (b ^ (b - 1)) >> 58]);
+}
+
+//Returns number of set bits in the bitboard
+extern inline int pop_count(Bitboard x) {
+	x = x - ((x >> 1) & k1);
+	x = (x & k2) + ((x >> 2) & k2);
+	x = (x + (x >> 4)) & k4;
+	x = (x * kf) >> 56;
+	return int(x);
+}
+
+//Returns number of set bits in the bitboard. Faster than pop_count(x) when the bitboard has few set bits
+extern inline int sparse_pop_count(Bitboard x) {
+	int count = 0;
+	while (x) {
+		count++;
+		x &= x - 1;
+	}
+	return count;
+}
+
+//Returns the index of the least significant bit in the bitboard, and removes the bit from the bitboard
+extern inline Square pop_lsb(Bitboard* b) {
+	int lsb = bsf(*b);
+	*b &= *b - 1;
+	return Square(lsb);
+}
 
 constexpr Rank rank_of(Square s) { return Rank(s >> 3); }
 constexpr File file_of(Square s) { return File(s & 0b111); }
