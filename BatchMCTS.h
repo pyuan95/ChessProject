@@ -26,6 +26,7 @@ private:
 	int batch_size;
 	int num_sectors;
 	Ndarray<int, 3> boards; // (batch_size * num_sectors, 8, 8)
+	Ndarray<int, 2> metadata; // (batch_size * num_sectors, 5)
 
 	int cur_sector;
 	std::vector<Sector> working_sectors;
@@ -60,19 +61,25 @@ public:
 		int batch_size,
 		int num_sectors,
 		float cpuct,
-		Ndarray<int, 3> boards
+		Ndarray<int, 3> boards,
+		Ndarray<int, 2> metadata
 	)
 		: num_threads(num_threads),
 		batch_size(batch_size),
 		num_sectors(num_sectors),
 		cpuct(cpuct),
 		boards(boards),
+		metadata(metadata),
 		cur_sector(0)
 	{
 		if (boards.getShape(0) != batch_size * num_sectors
 			|| boards.getShape(1) != ROWS
 			|| boards.getShape(2) != COLS) {
 			throw std::runtime_error("boards must have shape (batch_size * num_sectors, 8, 8)");
+		}
+		else if (metadata.getShape(0) != batch_size * num_sectors
+			|| metadata.getShape(1) != METADATA_LENGTH) {
+			throw std::runtime_error("metadata must have shape (batch_size * num_sectors, 5)");
 		}
 		this->arr.reserve(batch_size * num_sectors);
 		for (int i = 0; i < batch_size * num_sectors; i++) {
@@ -82,7 +89,7 @@ public:
 				new_output = output + "_" + std::to_string(i) + "_" + std::to_string(current_time);
 			}
 			this->arr.emplace_back(num_sims_per_move, temperature, autoplay, new_output);
-			this->arr.back().select(cpuct, boards[i]);
+			this->arr.back().select(cpuct, boards[i], metadata[i]);
 		}
 		working_sectors.reserve(num_sectors);
 		for (int i = 0; i < num_sectors; i++) {
@@ -107,5 +114,10 @@ public:
 		alive = false;
 		queue_add.notify_all();
 		queue_consumer_thread.join();
+
+		for (Sector& s : working_sectors) {
+			s.policy.destroy();
+			s.q.destroy();
+		}
 	}
 };

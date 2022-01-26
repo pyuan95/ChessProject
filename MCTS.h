@@ -34,6 +34,7 @@ struct Policy {
 // wrapper class for the board state; we can't directly store arrays in a vector.
 struct BoardState {
 	int b[ROWS][COLS];
+	int m[METADATA_LENGTH];
 };
 
 extern ostream& operator<<(ostream& os, const Policy& p);
@@ -64,7 +65,7 @@ inline int invert(int piece) {
 // 8...13 = their side (pawn, knight, bishop, rook, queen, king)
 // 14 = empty
 template<Color color>
-inline void writePosition(const Position& p, Ndarray<int, 2>& board) {
+inline void writePosition(const Position& p, Ndarray<int, 2>& board, Ndarray<int, 1>& metadata) {
 	int piece;
 	for (int r = 0; r < ROWS; r++) {
 		for (int c = 0; c < COLS; c++) {
@@ -79,10 +80,24 @@ inline void writePosition(const Position& p, Ndarray<int, 2>& board) {
 			}
 		}
 	}
+
+	metadata[0] = (p.history[p.ply()].entry & WHITE_OO_MASK) == 0;
+	metadata[1] = (p.history[p.ply()].entry & WHITE_OOO_MASK) == 0;
+	metadata[2] = (p.history[p.ply()].entry & BLACK_OO_MASK) == 0;
+	metadata[3] = (p.history[p.ply()].entry & BLACK_OOO_MASK) == 0;
+	metadata[4] = static_cast<int>(p.history[p.ply()].epsq);
+
+	if (color == BLACK) {
+		std::swap(metadata[0], metadata[2]);
+		std::swap(metadata[1], metadata[3]);
+		metadata[4] = 63 - metadata[4];
+	}
+	if (metadata[4] == 64) // no epsq
+		metadata[4] = -1;
 }
 
 template<Color color>
-inline void writePosition(const Position& p, int board[ROWS][COLS]) {
+inline void writePosition(const Position& p, int board[ROWS][COLS], int metadata[METADATA_LENGTH]) {
 	int piece;
 	for (int r = 0; r < ROWS; r++)
 	{
@@ -99,6 +114,20 @@ inline void writePosition(const Position& p, int board[ROWS][COLS]) {
 			}
 		}
 	}
+
+	metadata[0] = (p.history[p.ply()].entry & WHITE_OO_MASK) == 0;
+	metadata[1] = (p.history[p.ply()].entry & WHITE_OOO_MASK) == 0;
+	metadata[2] = (p.history[p.ply()].entry & BLACK_OO_MASK) == 0;
+	metadata[3] = (p.history[p.ply()].entry & BLACK_OOO_MASK) == 0;
+	metadata[4] = static_cast<int>(p.history[p.ply()].epsq);
+
+	if (color == BLACK) {
+		std::swap(metadata[0], metadata[2]);
+		std::swap(metadata[1], metadata[3]);
+		metadata[4] = 63 - metadata[4];
+	}
+	if (metadata[4] == 64) // no epsq
+		metadata[4] = -1;
 }
 
 void move2index(const Position& p, Move m, Color color, PolicyIndex& policyIndex);
@@ -294,7 +323,7 @@ private:
 	// false otherwise (even if autoplay off and max sims reached)
 	// white_moves and black_moves will be set to nullptr if this function returns false.
 	// requires: max sims not reached.
-	bool select_helper(const float cpuct, Ndarray<int, 2>& board);
+	bool select_helper(const float cpuct, Ndarray<int, 2>& board, Ndarray<int, 1>& metadata);
 
 public:
 
@@ -303,16 +332,20 @@ public:
 
 	inline Position position() { return p; } // for debugging only
 
-	inline void set_position(Position pos) {
+	inline void set_position(const Position& pos) {
 		this->p = pos;
 		if (root != nullptr)
-			delete root;
+			recursive_delete(*root, nullptr);
 		if (pos.turn() == WHITE)
 			root = new MCTSNode(WHITE);
 		else
 			root = new MCTSNode(BLACK);
 		best_leaf = nullptr;
 		best_leaf_path.clear();
+		temperature = default_temp;
+		nmoves = 0;
+		move_num = 1;
+		game_num = 1;
 	}
 
 	// returns whether we have reached the sim limit. relevent only if auto_play is false.
@@ -352,7 +385,7 @@ public:
 	// selects the best leaf thru MCTS and writes the position and the legal moves. Not threadsafe.
 	// Additionally, sets the best_leaf* to point to the selected node.
 	// if max sims is reached aNdarray<float, 3> DUMMY_POLICY;nd auto play is off, this method does nothing (does not assign best_leaf, change position, etc...)
-	void select(const float cpuct, Ndarray<int, 2> board);
+	void select(const float cpuct, Ndarray<int, 2> board, Ndarray<int, 1> metadata);
 
 	// expands the leaf node, backpropagates, plays the best move if necessary, resets the game if it's been terminated. Not threadsafe.
 	// also resets the selected leaf to null; select must be called again to select the best leaf.

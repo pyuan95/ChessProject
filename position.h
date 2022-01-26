@@ -52,9 +52,14 @@ struct UndoInfo {
 
 	constexpr UndoInfo() : entry(0), captured(NO_PIECE), epsq(NO_SQUARE) {}
 	
-	//This preserves the entry bitboard across moves
+	// commented out to preserve the correctness of copy constructor and copy assignment operator
+	/*
 	UndoInfo(const UndoInfo& prev) : 
 		entry(prev.entry), captured(NO_PIECE), epsq(NO_SQUARE) {}
+	*/
+
+	//This preserves the entry bitboard across moves
+	UndoInfo(const Bitboard& entry) : entry(entry), captured(NO_PIECE), epsq(NO_SQUARE) {}
 };
 
 class Position {
@@ -116,7 +121,7 @@ public:
 		// adds 0 to moves without capture or pawn move
 		ply_without_capture_or_pawn_move.push_back(0);
 	}
-	
+
 	//Places a piece on a particular square and updates the hash. Placing a piece on a square that is 
 	//already occupied is an error
 	inline void put_piece(Piece pc, Square s) {
@@ -235,7 +240,7 @@ template<Color C>
 void Position::play(const Move m) {
 	side_to_play = ~side_to_play;
 	++game_ply;
-	history[game_ply] = UndoInfo(history[game_ply - 1]);
+	history[game_ply] = UndoInfo(history[game_ply - 1].entry);
 
 	MoveFlags type = m.flags();
 	history[game_ply].entry |= SQUARE_BB[m.to()] | SQUARE_BB[m.from()];
@@ -577,7 +582,7 @@ Move* Position::generate_legals(Move* list) {
 		}
 
 		//Only add castling if:
-		//1. The king and the rook have both not moved
+		//1. The king and the rook have both not moved (history[game_ply].entry & oo_mask<Us>())
 		//2. No piece is attacking between the the rook and the king
 		//3. The king is not in check
 		if (!((history[game_ply].entry & oo_mask<Us>()) | ((all | danger) & oo_blockers_mask<Us>())))
