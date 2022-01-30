@@ -50,8 +50,13 @@ private:
 	int num_working_sectors();
 
 public:
+	// calling this function ensures that the Ndarray corresponding to the current sector has finished being selected and updated
 	void select();
+
+	// does a batch update to the current sector.
+	// Requires: the underlying data of q and policy does not get destroyed within the next [num_sector] calls to update()
 	void update(Ndarray<float, 1> q, Ndarray<float, 4> policy); // (batch_size), (batch_size, rows, cols, moves_per_square)
+
 	BatchMCTS(
 		int num_sims_per_move,
 		float temperature,
@@ -70,6 +75,14 @@ public:
 		cpuct(cpuct),
 		boards(boards),
 		metadata(metadata),
+		working_sectors(
+			num_sectors,
+			Sector(
+				-1,
+				Ndarray<float, 1>(nullptr, nullptr, nullptr),
+				Ndarray<float, 4>(nullptr, nullptr, nullptr)
+			)
+		),
 		cur_sector(0)
 	{
 		if (boards.getShape(0) != batch_size * num_sectors
@@ -91,22 +104,6 @@ public:
 			this->arr.emplace_back(num_sims_per_move, temperature, autoplay, new_output);
 			this->arr.back().select(cpuct, boards[i], metadata[i]);
 		}
-		working_sectors.reserve(num_sectors);
-		for (int i = 0; i < num_sectors; i++) {
-			working_sectors.emplace_back(
-				-1,
-				Ndarray<float, 1>(
-					new float[batch_size],
-					new long[1]{ batch_size },
-					new long[1]{ 1 }
-					),
-				Ndarray<float, 4>(
-					new float[batch_size * ROWS * COLS * MOVES_PER_SQUARE](),
-					new long[4]{ batch_size, ROWS, COLS, MOVES_PER_SQUARE },
-					new long[4]{ ROWS * COLS * MOVES_PER_SQUARE, COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
-					)
-			);
-		}
 		queue_consumer_thread = std::thread(&BatchMCTS::queue_consumer, this);
 	}
 
@@ -114,10 +111,5 @@ public:
 		alive = false;
 		queue_add.notify_all();
 		queue_consumer_thread.join();
-
-		for (Sector& s : working_sectors) {
-			s.policy.destroy();
-			s.q.destroy();
-		}
 	}
 };

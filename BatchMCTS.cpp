@@ -86,9 +86,9 @@ void BatchMCTS::select() {
 void BatchMCTS::update(Ndarray<float, 1> q, Ndarray<float, 4> policy) {
 	queue_consumer_mutex.lock();
 	working_sectors[cur_sector].sector = cur_sector;
-	queue_consumer_mutex.unlock();
-	working_sectors[cur_sector].policy.copy(policy);
-	working_sectors[cur_sector].q.copy(q);
+	working_sectors[cur_sector].q = q;
+	working_sectors[cur_sector].policy = policy;
 	cur_sector = (cur_sector + 1) % num_sectors;
 	queue_add.notify_all(); // notify queue_consumer
+	queue_consumer_mutex.unlock();
 }
