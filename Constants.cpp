@@ -30,6 +30,7 @@ extern int move2index_initializer(PieceType pt, Move m, Color color) {
 		}
 		else {
 			// throw std::runtime_error("Illegal argument provided to move2index: Queen move");
+			return -1;
 		}
 		num = abs(num);
 		i = dir * 7 + num - 1;
@@ -63,7 +64,7 @@ extern int move2index_initializer(PieceType pt, Move m, Color color) {
 			break;
 		default:
 			// throw std::runtime_error("Illegal argument provided to move2index: Knight move");
-			break;
+			return -1;
 		}
 		i = dir + 56;
 		break;
@@ -100,7 +101,7 @@ extern int move2index_initializer(PieceType pt, Move m, Color color) {
 			break;
 		default:
 			// throw std::runtime_error("Illegal argument provided to move2index: pawn move");
-			break;
+			return -1;
 		}
 		if (!prom) {
 			i = dir * 7 + 1 - 1;
@@ -112,8 +113,7 @@ extern int move2index_initializer(PieceType pt, Move m, Color color) {
 		break;
 	}
 	default:
-		// throw std::runtime_error("Invalid PieceType, should never happen!");
-		break;
+		return -1;
 	}
 	return i;
 }

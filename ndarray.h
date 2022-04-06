@@ -59,6 +59,7 @@ public:
     long getShape(const int axis);
     void copy(Ndarray<datatype, ndim> other);
     typename getItemTraits<datatype, ndim>::returnType operator[](unsigned long i);
+    void destroy();
 };
 
 // Ndarray constructor
@@ -109,6 +110,14 @@ inline void Ndarray<datatype, ndim>::copy(Ndarray<datatype, ndim> other)
     memcpy(this->data, other.data, sizeof(datatype) * size);
 }
 
+template<typename datatype, int ndim>
+inline void Ndarray<datatype, ndim>::destroy()
+{
+    delete[] data;
+    delete[] shape;
+    delete[] strides;
+}
+
 // Ndarray overloaded []-operator.
 // The [i][j][k] selection is recursively replaced by i*strides[0]+j*strides[1]+k*strides[2]
 // at compile time, using template meta-programming. If the axes are not exhausted, return
@@ -140,7 +149,9 @@ public:
     Ndarray(const Ndarray<datatype, 1>& array);
     Ndarray(const numpyArray<datatype>& array);
     long getShape(const int axis);
+    void copy(Ndarray<datatype, 1> other);
     typename getItemTraits<datatype, 1>::returnType operator[](unsigned long i);
+    void destroy();
 };
 
 
@@ -184,6 +195,22 @@ long Ndarray<datatype, 1>::getShape(const int axis)
     return this->shape[axis];
 }
 
+template<typename datatype>
+inline void Ndarray<datatype, 1>::copy(Ndarray<datatype, 1> other)
+{
+    size_t size = this->shape[0];
+    memcpy(this->data, other.data, sizeof(datatype) * size);
+}
+
+template<typename datatype>
+inline void Ndarray<datatype, 1>::destroy()
+{
+    delete[] data;
+    delete[] shape;
+    delete[] strides;
+}
+
+
 // Partial specialised [] operator: for 1D arrays, return an element rather than a subarray 
 
 template<typename datatype>
@@ -192,6 +219,7 @@ Ndarray<datatype, 1>::operator[](unsigned long i)
 {
     return this->data[i * this->strides[0]];
 }
+
 
 template<typename datatype>
 inline std::ostream& operator<<(std::ostream& out, Ndarray<datatype, 1> arr) {

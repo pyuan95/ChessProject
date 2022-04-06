@@ -206,6 +206,7 @@ void MCTS::add_move(BoardState& board_state, Policy& policy, LegalMoves& legal_m
 				}
 			}
 		}
+		output << "\n";
 		output << m << "\n";
 		output << c << "\n";
 	}
@@ -250,8 +251,8 @@ size_t MCTSNode::size() {
 	return tot;
 }
 
-void MCTS::select(const float cpuct, Ndarray<int, 2> board) {
-	while ((root->get_num_times_selected() < sims || auto_play) && select_helper(cpuct, board)) {
+void MCTS::select(const float cpuct, Ndarray<int, 2> board, Ndarray<int, 1> metadata) {
+	while ((root->get_num_times_selected() < sims || auto_play) && select_helper(cpuct, board, metadata)) {
 		// select helper returned true. means p is at a terminal position now.
 		float q = evaluateTerminalPosition(p);
 		if (best_leaf->get_color() == BLACK)
@@ -260,7 +261,7 @@ void MCTS::select(const float cpuct, Ndarray<int, 2> board) {
 	}
 }
 
-bool MCTS::select_helper(const float cpuct, Ndarray<int, 2>& board) {
+bool MCTS::select_helper(const float cpuct, Ndarray<int, 2>& board, Ndarray<int, 1>& metadata) {
 	MCTSNode* cur = root;
 	best_leaf_path.emplace_back(cur, 0);
 	std::pair<MCTSNode*, Move> child(0, 0);
@@ -302,10 +303,10 @@ bool MCTS::select_helper(const float cpuct, Ndarray<int, 2>& board) {
 	// our leaf is not a terminal position.
 	else {
 		if (best_leaf->get_color() == WHITE) {
-			writePosition<WHITE>(p, board);
+			writePosition<WHITE>(p, board, metadata);
 		}
 		else if (best_leaf->get_color() == BLACK) {
-			writePosition<BLACK>(p, board);
+			writePosition<BLACK>(p, board, metadata);
 		}
 		return false;
 	}
@@ -374,9 +375,9 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 		// now, write the board state.
 		BoardState board_state;
 		if (root->get_color() == WHITE)
-			writePosition<WHITE>(p, board_state.b);
+			writePosition<WHITE>(p, board_state.b, board_state.m);
 		else
-			writePosition<BLACK>(p, board_state.b);
+			writePosition<BLACK>(p, board_state.b, board_state.m);
 
 		// update the board position
 		pair<MCTSNode*, Move> best_child = root->select_best_child_by_count(temperature);
@@ -445,6 +446,9 @@ ostream& operator<<(ostream& os, const BoardState& b) {
 			os << std::to_string(b.b[i][j]);
 			os << ",";
 		}
+	}
+	for (int i = 0; i < METADATA_LENGTH; i++) {
+		os << b.m[i] << ",";
 	}
 	return os;
 }

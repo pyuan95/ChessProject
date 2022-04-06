@@ -29,7 +29,7 @@ void BatchMCTS::process_thread(Ndarray<float, 1> q, Ndarray<float, 4> policy, in
 			m.unlock();
 
 			arr[cur_idx].update(q[policy_index], policy[policy_index]);
-			arr[cur_idx].select(cpuct, boards[cur_idx]);
+			arr[cur_idx].select(cpuct, boards[cur_idx], metadata[cur_idx]);
 		}
 		else {
 			m.unlock();
@@ -45,6 +45,7 @@ void BatchMCTS::queue_consumer() {
 			// std::cout << "waiting queue_consumer\n";
 			queue_add.wait(lock);
 		}
+		lock.unlock();
 		if (alive) {
 			Sector& s = get_next_sector();
 			update_sector(s.sector, s.q, s.policy);
@@ -83,8 +84,11 @@ void BatchMCTS::select() {
 }
 
 void BatchMCTS::update(Ndarray<float, 1> q, Ndarray<float, 4> policy) {
-	std::unique_lock<std::mutex> lock(queue_consumer_mutex);
+	queue_consumer_mutex.lock();
 	working_sectors[cur_sector].sector = cur_sector;
+	working_sectors[cur_sector].q = q;
+	working_sectors[cur_sector].policy = policy;
 	cur_sector = (cur_sector + 1) % num_sectors;
 	queue_add.notify_all(); // notify queue_consumer
+	queue_consumer_mutex.unlock();
 }
