@@ -571,16 +571,15 @@ void test_select_best_move_correctly() {
 }
 
 void batch_mcts_test() {
-	int iterations = 1000;
-	int num_sims_per_move = 1000;
+	int iterations = 50000;
+	int num_sims_per_move = 100;
 	float temperature = 1.0;
 	bool autoplay = true;
 	string output = "./output/output";
-	output = "";
 
 	int num_threads = 12;
-	int batch_size = 5000;
-	int num_sectors = 2;
+	int batch_size = 30;
+	int num_sectors = 1;
 	float cpuct = 1.0;
 
 	Ndarray<int, 3> boards(
@@ -672,6 +671,7 @@ void test_ndarray_copy() {
 void run_all_tests() {
 	print_test(&batch_mcts_test, "batch mcts");
 	if (false) {
+		// print_test(&batch_mcts_test, "batch mcts");
 		print_test(&promotion_test, "Promotion Test");
 		print_test(&test_ndarray_copy, "test ndarray copy");
 		print_test(&autoplay_test, "Autoplay Test");

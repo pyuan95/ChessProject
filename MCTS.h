@@ -276,6 +276,7 @@ private:
 	bool auto_play;
 	uint32_t sims;
 	const float default_temp;
+	string output_path_base;
 	ofstream output;
 	int move_num;
 	int game_num;
@@ -295,6 +296,14 @@ private:
 	// white_moves and black_moves will be set to nullptr if this function returns false.
 	// requires: max sims not reached.
 	bool select_helper(const float cpuct, Ndarray<int, 2>& board);
+
+	inline void update_output() {
+		if (this->output.is_open())
+			this->output.close();
+		if (!output_path_base.empty()) {
+			this->output.open(output_path_base + "_" + to_string(game_num));
+		}
+	}
 
 public:
 
@@ -364,11 +373,9 @@ public:
 		root(new MCTSNode(WHITE)), best_leaf(nullptr), best_leaf_path(), p(),
 		sims(num_sims_per_move), temperature(t), default_temp(t),
 		auto_play(auto_play), moves(new Move[MAX_MOVES]), nmoves(0), leaves(MAX_MOVES, pair<Move, float>(0, 0.0f)),
-		move_num(1), game_num(1)
+		move_num(1), game_num(1), output_path_base(output)
 	{
-		if (!output.empty()) {
-			this->output.open(output);
-		}
+		update_output();
 		best_leaf_path.reserve(200);
 	}
 
@@ -395,6 +402,7 @@ public:
 		auto_play(other.auto_play),
 		sims(other.sims),
 		default_temp(other.default_temp),
+		output_path_base(other.output_path_base),
 		output(std::move(other.output)),
 		move_num(other.move_num),
 		game_num(other.game_num),

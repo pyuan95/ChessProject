@@ -208,7 +208,6 @@ void MCTS::add_move(BoardState& board_state, Policy& policy, LegalMoves& legal_m
 		}
 		output << m << "\n";
 		output << c << "\n";
-		output.flush();
 	}
 	move_num++;
 }
@@ -233,10 +232,7 @@ void MCTS::new_game() {
 	temperature = default_temp;
 	game_num++;
 	move_num = 1;
-	if (output.is_open()) {
-		output << "\n";
-		output.flush();
-	}
+	update_output();
 }
 
 int MCTS::move_number() {
