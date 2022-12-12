@@ -442,7 +442,7 @@ public:
 	// expands the leaf node, backpropagates, plays the best move if aut-play enabled, resets the game if it's been terminated. Not threadsafe.
 	// also resets the selected leaf to null; select must be called again to select the best leaf.
 	// if autoplay is disabled and the max sim limit has been reached, this method does nothing except reset invariants
-	// requires: select has been called.
+	// requires: select has been called. policy is softmaxed
 	void update(const float q, Ndarray<float, 3> policy);
 
 	// auto-auto_play: whether to automatically play the next move when num_sims_to_play is reached

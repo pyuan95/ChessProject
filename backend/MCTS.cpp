@@ -169,7 +169,6 @@ void MCTSNode::expand(
 		init_memory();
 
 		float tot = 0;
-		// vector<pair<Move, float>> leaves(size, pair<Move, float>(0, 0.0f));
 		PolicyIndex policyIndex;
 		for (int i = 0; i < size; i++) {
 			move2index(p, moves[i], get_color(), policyIndex);
@@ -183,7 +182,7 @@ void MCTSNode::expand(
 
 		for (int i = 0; i < size; i++) {
 			set_move_at(i, leaves[i].first);
-			set_prob_at(i, leaves[i].second / tot);
+			set_prob_at(i, leaves[i].second);
 		}
 	}
 }

@@ -463,10 +463,13 @@ void select_best_move_test() {
 	vector<pair<Move, float_t>> pol = m->policy(1);
 	std::sort(pol.begin(), pol.end(), comp);
 
+	float tot = 0;
 	for (auto k : pol)
 	{
 		std::cout << k.first << "\t" << k.second << "\n";
+		tot += k.second;
 	}
+	std::cout << "total prob: " << tot << "\n";
 	// std::cout << (m->turn() ? "BLACK" : "WHITE") << "'s Q evaluation: " << m->evaluation() << "\n";
 	// std::cout << (m->turn() ? "BLACK" : "WHITE") << "'s minimax evaluation: " << m->minimax_evaluation() << "\n";
 	assert(m->get_best_move(0.1f).from() == b7); // assert that we found the move that leads to mate in 5.
@@ -752,16 +755,15 @@ void test_select_best_move_correctly() {
 }
 
 void batch_mcts_test() {
-	int iterations = 5000;
-	int num_sims_per_move = 1600;
+	int iterations = 1000000;
+	int num_sims_per_move = 500;
 	float temperature = 1.0;
 	bool autoplay = true;
-	string output = "./output/output";
-	output = "";
+	string output = "./games/game";
 
 	int num_threads = 8;
-	int batch_size = 1000;
-	int num_sectors = 2;
+	int batch_size = 5;
+	int num_sectors = 1;
 	float cpuct = 1.0;
 
 	Ndarray<int, 3> boards(
@@ -894,9 +896,9 @@ void test_ndarray_copy() {
 }
 
 void run_all_tests() {
-	print_test(&test_metadata, "metadata test");
 	// print_test(&batch_mcts_test, "batch mcts");
-	if (true) {
+	if (false) {
+		print_test(&test_metadata, "metadata test");
 		print_test(&promotion_test, "Promotion Test");
 		print_test(&test_ndarray_copy, "test ndarray copy");
 		print_test(&autoplay_test, "Autoplay Test");
@@ -911,6 +913,6 @@ void run_all_tests() {
 		print_test(&policy_completeness_test, "Policy Completeness Test");
 		print_test(&policy_rotation_test, "Policy Rotation Test");
 		print_test(&select_and_update_no_errors, "Select and Update no Errors Test");
-		// print_test(&memory_test, "Memory Test");
+		print_test(&memory_test, "Memory Test");
 	}
 }
