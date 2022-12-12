@@ -21,8 +21,7 @@ void writeLegalMoves(Position& p, LegalMoves& legal_moves) {
 	}
 }
 
-// returns -1 if it is a victory for black, 0 for a draw, 1 for a victory for white.
-// requires: p is a terminal position (there are no legal moves)
+// returns -1 if it is a victory for black, 1 for a victory for white, 0 otherwise
 float evaluateTerminalPosition(const Position& p)
 {
 	if (p.in_check<WHITE>())
@@ -251,14 +250,8 @@ size_t MCTSNode::size() {
 	return tot;
 }
 
-void MCTS::select(const float cpuct, Ndarray<int, 2> board, Ndarray<int, 1> metadata) {
-	while ((root->get_num_times_selected() < sims || auto_play) && select_helper(cpuct, board, metadata)) {
-		// select helper returned true. means p is at a terminal position now.
-		float q = evaluateTerminalPosition(p);
-		if (best_leaf->get_color() == BLACK)
-			q *= -1;
-		update(q, DUMMY_POLICY);
-	}
+bool MCTS::select(const float cpuct, Ndarray<int, 2> board, Ndarray<int, 1> metadata) {
+	return select_helper(cpuct, board, metadata);
 }
 
 bool MCTS::select_helper(const float cpuct, Ndarray<int, 2>& board, Ndarray<int, 1>& metadata) {
@@ -296,32 +289,95 @@ bool MCTS::select_helper(const float cpuct, Ndarray<int, 2>& board, Ndarray<int,
 		if (itp)
 			best_leaf->mark_terminal_position();
 	}
-	// our leaf is a terminal position. return true.
-	if (best_leaf->is_terminal_position()) {
-		return true;
+
+	if (best_leaf->get_color() == WHITE) {
+		writePosition<WHITE>(p, board, metadata);
 	}
-	// our leaf is not a terminal position.
-	else {
-		if (best_leaf->get_color() == WHITE) {
-			writePosition<WHITE>(p, board, metadata);
-		}
-		else if (best_leaf->get_color() == BLACK) {
-			writePosition<BLACK>(p, board, metadata);
-		}
-		return false;
+	else if (best_leaf->get_color() == BLACK) {
+		writePosition<BLACK>(p, board, metadata);
+	}
+	return best_leaf->is_terminal_position();
+}
+
+void MCTS::play_best_move() {
+	// first, calculate the policy.
+	if (root->is_terminal_position()) {
+		// only can happen when autoplay disabled
+		return;
+	}
+	Policy policy;
+	vector<pair<Move, float>> policy_vec = root->policy(temperature);
+	PolicyIndex pidx;
+	for (const auto &move_and_prob : policy_vec)
+	{
+		Move move = move_and_prob.first;
+		float prob = move_and_prob.second;
+		if (root->get_color() == WHITE)
+			move2index(p, move, WHITE, pidx);
+		else
+			move2index(p, move, BLACK, pidx);
+		policy.p[pidx.r][pidx.c][pidx.i] = prob;
+	}
+
+	// write the legal moves;
+	LegalMoves legal_moves;
+	if (root->get_color() == WHITE)
+		writeLegalMoves<WHITE>(p, legal_moves);
+	else
+		writeLegalMoves<BLACK>(p, legal_moves);
+
+	// now, write the board state.
+	BoardState board_state;
+	if (root->get_color() == WHITE)
+		writePosition<WHITE>(p, board_state.b, board_state.m);
+	else
+		writePosition<BLACK>(p, board_state.b, board_state.m);
+
+	// update the board position
+	pair<MCTSNode*, Move> best_child = root->select_best_child_by_count(temperature);
+	Move m = best_child.second;
+	Color root_color = root->get_color();
+	if (root_color == WHITE)
+		p.play<WHITE>(m);
+	else
+		p.play<BLACK>(m);
+
+	MCTSNode* newRoot = new MCTSNode(*(best_child.first)); // shallow copy the best child
+	recursive_delete(*root, best_child.first);
+	root = newRoot;
+
+	// add the move to the game.
+	add_move(board_state, policy, legal_moves, m, root_color);
+
+	if (auto_play && move_number() == 40) {
+		temperature = 0.25;
+	}
+
+	// check to see if the game is over. if so, declare a winner and start a new game.
+	if (root->is_terminal_position() && auto_play) {
+		declare_winner(evaluateTerminalPosition(p));
+		new_game();
 	}
 }
 
 void MCTS::update(const float q, Ndarray<float, 3> policy)
 {
-	if (root->get_num_times_selected() >= sims && !auto_play) {
-		// over the max sims and no auto-play; simply exit. but we need to maintain our invariants.
-		if (best_leaf_path.size() > 0 || best_leaf != nullptr) {
-			std::cout << "max sims reached and auto play off, but somehow leaf path was not empty or best_leaf non-null.";
-			throw runtime_error("max sims error");
-		}
-		return;
+	// if auto-play is true we will never be over the sim limit
+	// but let's sanity check this just in case.
+	if (root->get_num_times_selected() >= sims && auto_play) {
+		std::string err = "somehow went over max-sims with auto-play enabled. should be impossible!";
+		std::cout << err << "\n";
+		throw runtime_error(err);
 	}
+
+	float val = q;
+	if (best_leaf->is_terminal_position()) {
+		// p is at terminal position
+		val = evaluateTerminalPosition(p);
+		if (best_leaf->get_color() == BLACK)
+	 		val *= -1;
+	}
+
 	Color best_leaf_color = best_leaf->get_color();
 	if (nmoves > 0 && best_leaf_color == WHITE) {
 		best_leaf->expand(p, policy, moves, nmoves, leaves);
@@ -329,6 +385,7 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 	else if (nmoves > 0 && best_leaf_color == BLACK) {
 		best_leaf->expand(p, policy, moves, nmoves, leaves);
 	}
+
 	best_leaf = nullptr;
 
 	// backpropagate the q value.
@@ -338,7 +395,7 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 		cur = best_leaf_path.back().first;
 		m = best_leaf_path.back().second;
 		best_leaf_path.pop_back();
-		cur->backup(cur->get_color() == best_leaf_color ? q : -1.0f * q);
+		cur->backup(cur->get_color() == best_leaf_color ? val : -1.0f * val);
 		if (cur != root) {
 			if (cur->get_color() == WHITE)
 				p.undo<BLACK>(m);
@@ -349,60 +406,7 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 
 	// if the the root's visit count is equal to the number of sims, we need to play our move.
 	while (root->get_num_times_selected() >= sims && auto_play)
-	{
-		// first, calculate the policy.
-		Policy policy;
-		vector<pair<Move, float>> policy_vec = root->policy(temperature);
-		PolicyIndex pidx;
-		for (const auto &move_and_prob : policy_vec)
-		{
-			Move move = move_and_prob.first;
-			float prob = move_and_prob.second;
-			if (root->get_color() == WHITE)
-				move2index(p, move, WHITE, pidx);
-			else
-				move2index(p, move, BLACK, pidx);
-			policy.p[pidx.r][pidx.c][pidx.i] = prob;
-		}
-
-		// write the legal moves;
-		LegalMoves legal_moves;
-		if (root->get_color() == WHITE)
-			writeLegalMoves<WHITE>(p, legal_moves);
-		else
-			writeLegalMoves<BLACK>(p, legal_moves);
-
-		// now, write the board state.
-		BoardState board_state;
-		if (root->get_color() == WHITE)
-			writePosition<WHITE>(p, board_state.b, board_state.m);
-		else
-			writePosition<BLACK>(p, board_state.b, board_state.m);
-
-		// update the board position
-		pair<MCTSNode*, Move> best_child = root->select_best_child_by_count(temperature);
-		Move m = best_child.second;
-		Color root_color = root->get_color();
-		if (root_color == WHITE)
-			p.play<WHITE>(m);
-		else
-			p.play<BLACK>(m);
-
-		MCTSNode* newRoot = new MCTSNode(*(best_child.first)); // shallow copy the best child
-		recursive_delete(*root, best_child.first);
-		root = newRoot;
-
-		// add the move to the game.
-		add_move(board_state, policy, legal_moves, m, root_color);
-
-		// check to see if the game is over. if so, declare a winner and start a new game.
-		root_color = root->get_color();
-		if ((root_color == WHITE && MoveList<WHITE>(p).size() == 0)
-			|| (root_color == BLACK && MoveList<BLACK>(p).size() == 0)) {
-			declare_winner(evaluateTerminalPosition(p));
-			new_game();
-		}
-	}
+		play_best_move();
 }
 
 void recursive_delete(MCTSNode& n, MCTSNode* ignore) {

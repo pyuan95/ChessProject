@@ -57,6 +57,23 @@ public:
 	// Requires: the underlying data of q and policy does not get destroyed within the next [num_sector] calls to update()
 	void update(Ndarray<float, 1> q, Ndarray<float, 4> policy); // (batch_size), (batch_size, rows, cols, moves_per_square)
 
+	// sets the temperature for each game
+	inline void set_temperature(float const temp) {
+		for (MCTS& m : arr) {
+			m.temperature = temp;
+		}
+	}
+
+	// for each game...
+	// samples a move from the policy according to the temperature and plays it.
+	// if we are at a terminal position, we do nothing
+	// if the best move leads to a terminal position and autoplay is on, the game is restarted
+	inline void play_best_moves() {
+		for (MCTS& m : arr) {
+			m.play_best_move();
+		}
+	}
+
 	BatchMCTS(
 		int num_sims_per_move,
 		float temperature,

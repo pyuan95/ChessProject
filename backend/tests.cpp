@@ -172,7 +172,6 @@ void test_metadata() {
 	);
 	m->select(10, board, metadata);
 	m->update(0.0, dummy_policy);
-	
 	assert(metadata[0] + metadata[1] + metadata[2] + metadata[3] == 4);
 	assert(metadata[4] == -1);
 
@@ -381,18 +380,29 @@ void select_and_update_no_errors() {
 	}
 	assert(!m->reached_sim_limit());
 	assert(m->move_number() == 1);
-	assert(m->current_sims() >= 1000);
+	assert(m->current_sims() == 1000);
 	assert(m->position() == p1);
 
-	for (int i = 0; i < 10000; i++) // play 10k more moves. we should be over the max_sim
+	for (int i = 0; i < 10000; i++) // play 10k more moves
 	{
 		m->select(10, board, metadata);
 		m->update(0.0, dummy_policy);
 	}
 	assert(m->reached_sim_limit());
 	assert(m->move_number() == 1);
-	assert(m->current_sims() == 10000);
+	assert(m->current_sims() == 11000);
 	assert(m->position() == p1);
+	delete m;
+
+	m = new MCTS(10000, 0, true);
+	// play 10k more moves. we should be over the max_sim and have reset.
+	for (int i = 0; i < 10000; i++)
+	{
+		m->select(10, board, metadata);
+		m->update(0.0, dummy_policy);
+	}
+	assert(m->current_sims() < 10000);
+	assert(m->move_number() == 2);
 	delete m;
 }
 
@@ -430,8 +440,10 @@ void select_best_move_test() {
 		new long[1]{ METADATA_LENGTH },
 		new long[1]{ 1 }
 	);
+	bool is_terminal = false;
 	while (m->current_sims() < SIMS) {
-		m->select(CPUCT, board, metadata);
+		bool term = m->select(CPUCT, board, metadata);
+		is_terminal = term || is_terminal;
 		m->update(0.00, dummy_policy);
 		if (m->current_sims() % 100000 == 0)
 			std::cout << "Current sims: " << m->current_sims() << "\n";
@@ -449,6 +461,7 @@ void select_best_move_test() {
 	// std::cout << (m->turn() ? "BLACK" : "WHITE") << "'s Q evaluation: " << m->evaluation() << "\n";
 	// std::cout << (m->turn() ? "BLACK" : "WHITE") << "'s minimax evaluation: " << m->minimax_evaluation() << "\n";
 	assert(m->get_best_move(0.1f).from() == b7); // assert that we found the move that leads to mate in 5.
+	// assert(m->get_best_move(0.1f).to() == g2); 
 	delete m;
 }
 
@@ -463,8 +476,6 @@ void autoplay_test() {
 		new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
 		new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
 	);
-
-
 
 	for (int r = 0; r < ROWS; r++)
 	{
