@@ -92,7 +92,7 @@ inline void writePosition(const Position& p, Ndarray<int, 2>& board, Ndarray<int
 		std::swap(metadata[1], metadata[3]);
 		metadata[4] = 63 - metadata[4];
 	}
-	if (metadata[4] == 64) // no epsq
+	if (metadata[4] == NO_SQUARE) // no epsq
 		metadata[4] = -1;
 }
 
@@ -126,7 +126,7 @@ inline void writePosition(const Position& p, int board[ROWS][COLS], int metadata
 		std::swap(metadata[1], metadata[3]);
 		metadata[4] = 63 - metadata[4];
 	}
-	if (metadata[4] == 64) // no epsq
+	if (metadata[4] == NO_SQUARE) // no epsq
 		metadata[4] = -1;
 }
 
@@ -147,8 +147,6 @@ private:
 	float q;
 	uint32_t num_times_selected;
 	uint8_t* children;
-
-	inline void set_terminal_position(bool itp) { color_itp = color_itp | ((int)itp); }
 
 	inline void set_color(Color c) { color_itp = color_itp | (c << 1u); }
 
@@ -206,10 +204,10 @@ public:
 	inline bool is_terminal_position() { return color_itp & 1u; }
 
 	// returns the color of the side whose turn it is to play
-	inline Color get_color() { return (color_itp >> 1) & 1u ? BLACK : WHITE; }
+	inline Color get_color() { return color_itp & 2u ? BLACK : WHITE; }
 
 	// marks the current node as terminal position.
-	inline void mark_terminal_position() { set_terminal_position(true); }
+	inline void mark_terminal_position() { color_itp = color_itp | 1; }
 
 	// returns the number of times this node was selected.
 	inline uint32_t get_num_times_selected() { return num_times_selected; }

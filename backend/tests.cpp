@@ -139,8 +139,9 @@ void rotation_test() {
 	);
 	writePosition<WHITE>(p1, board1, metadata);
 	writePosition<BLACK>(p2, board2, metadata);
-	for (int i = 0; i < 64; i++)
-		assert(board1[i >> 3][i & 8] == board2[i >> 3][i & 8]);
+	for (int i = 0; i < 64; i++) {
+		assert(board1[i >> 3][i & 7] == board2[i >> 3][i & 7]);
+	}
 }
 
 void test_metadata() {
@@ -874,9 +875,8 @@ void test_ndarray_copy() {
 
 void run_all_tests() {
 	print_test(&test_metadata, "metadata test");
-	print_test(&batch_mcts_test, "batch mcts");
-	if (false) {
-		// print_test(&batch_mcts_test, "batch mcts");
+	// print_test(&batch_mcts_test, "batch mcts");
+	if (true) {
 		print_test(&promotion_test, "Promotion Test");
 		print_test(&test_ndarray_copy, "test ndarray copy");
 		print_test(&autoplay_test, "Autoplay Test");
@@ -891,6 +891,6 @@ void run_all_tests() {
 		print_test(&policy_completeness_test, "Policy Completeness Test");
 		print_test(&policy_rotation_test, "Policy Rotation Test");
 		print_test(&select_and_update_no_errors, "Select and Update no Errors Test");
-		print_test(&memory_test, "Memory Test");
+		// print_test(&memory_test, "Memory Test");
 	}
 }

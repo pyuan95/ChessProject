@@ -8,7 +8,7 @@
 #ifndef NDARRAY_H
 #define NDARRAY_H
 #include <cstring>
-
+#include <iostream>
 
 // The C-struct to retrieve the ctypes structure.
 // Note: Order of struct members must be the same as in Python.
