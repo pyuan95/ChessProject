@@ -364,10 +364,30 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 {
 	// if auto-play is true we will never be over the sim limit
 	// but let's sanity check this just in case.
-	if (root->get_num_times_selected() >= sims && auto_play) {
-		std::string err = "somehow went over max-sims with auto-play enabled. should be impossible!";
+	if (root->get_num_times_selected() >= sim_limit && auto_play) {
+		std::string err = "somehow went over max-sim_limit with auto-play enabled. should be impossible!";
 		std::cout << err << "\n";
 		throw runtime_error(err);
+	}
+
+	// if auto-play is disabled and we reach the sim limit,
+	// then simply unwind the invariants and return
+	if (root->get_num_times_selected() >= sim_limit && !auto_play) {
+		best_leaf = nullptr;
+		Move m;
+		MCTSNode* cur;
+		while (!best_leaf_path.empty()) {
+			cur = best_leaf_path.back().first;
+			m = best_leaf_path.back().second;
+			best_leaf_path.pop_back();
+			if (cur != root) {
+				if (cur->get_color() == WHITE)
+					p.undo<BLACK>(m);
+				else
+					p.undo<WHITE>(m);
+			}
+		}
+		return;
 	}
 
 	float val = q;
@@ -404,8 +424,8 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 		}
 	}
 
-	// if the the root's visit count is equal to the number of sims, we need to play our move.
-	while (root->get_num_times_selected() >= sims && auto_play)
+	// if the the root's visit count is equal to the number of sim_limit, we need to play our move.
+	while (root->get_num_times_selected() >= sim_limit && auto_play)
 		play_best_move();
 }
 

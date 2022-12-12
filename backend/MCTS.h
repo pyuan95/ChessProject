@@ -323,7 +323,7 @@ private:
 	vector<pair<Move, float>> leaves;
 	Position p;
 	bool auto_play;
-	uint32_t sims;
+	uint64_t sim_limit;
 	const float default_temp;
 	string output_path_base;
 	ofstream output;
@@ -341,9 +341,9 @@ private:
 	void new_game();
 
 	// the select helper. returns true if select-helper led to selecting on a terminal position and nothing was written.
-	// false otherwise (even if autoplay off and max sims reached)
+	// false otherwise (even if autoplay off and max sim_limit reached)
 	// white_moves and black_moves will be set to nullptr if this function returns false.
-	// requires: max sims not reached.
+	// requires: max sim_limit not reached.
 	bool select_helper(const float cpuct, Ndarray<int, 2> &board, Ndarray<int, 1> &metadata);
 
 	inline void update_output()
@@ -395,12 +395,12 @@ public:
 	}
 
 	// returns whether we have reached the sim limit. relevent only if auto_play is false.
-	inline bool reached_sim_limit() { return root->get_num_times_selected() >= sims; }
+	inline bool reached_sim_limit() { return root->get_num_times_selected() >= sim_limit; }
 
-	// returns the current number of sims in the root.
+	// returns the current number of sim_limit in the root.
 	inline int current_sims() { return root->get_num_times_selected(); }
 
-	inline void set_sims(unsigned int count) { sims = count; }
+	inline void set_sim_limit(unsigned int count) { sim_limit = count; }
 
 	// returns whose turn it is to play. 0 for white, 1 for black.
 	inline int turn() { return p.turn(); }
@@ -441,12 +441,13 @@ public:
 
 	// expands the leaf node, backpropagates, plays the best move if aut-play enabled, resets the game if it's been terminated. Not threadsafe.
 	// also resets the selected leaf to null; select must be called again to select the best leaf.
+	// if autoplay is disabled and the max sim limit has been reached, this method does nothing except reset invariants
 	// requires: select has been called.
 	void update(const float q, Ndarray<float, 3> policy);
 
 	// auto-auto_play: whether to automatically play the next move when num_sims_to_play is reached
 	MCTS(const int num_sims_per_move, float t = 1.0, bool auto_play = true, string output = "") : root(new MCTSNode(WHITE)), best_leaf(nullptr), best_leaf_path(), p(),
-																								  sims(num_sims_per_move), temperature(t), default_temp(t),
+																								  sim_limit(num_sims_per_move), temperature(t), default_temp(t),
 																								  auto_play(auto_play), moves(new Move[MAX_MOVES]), nmoves(0), leaves(MAX_MOVES, pair<Move, float>(0, 0.0f)),
 																								  move_num(1), game_num(1), output_path_base(output)
 	{
@@ -476,7 +477,7 @@ public:
 			   leaves(std::move(other.leaves)),
 			   p(std::move(other.p)),
 			   auto_play(other.auto_play),
-			   sims(other.sims),
+			   sim_limit(other.sim_limit),
 			   default_temp(other.default_temp),
 			   output_path_base(other.output_path_base),
 			   output(std::move(other.output)),

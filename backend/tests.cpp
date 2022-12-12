@@ -382,15 +382,24 @@ void select_and_update_no_errors() {
 	assert(m->move_number() == 1);
 	assert(m->current_sims() == 1000);
 	assert(m->position() == p1);
-
-	for (int i = 0; i < 10000; i++) // play 10k more moves
+	for (int i = 0; i < 10000; i++) // play 10k more moves. should hit limit
 	{
 		m->select(10, board, metadata);
 		m->update(0.0, dummy_policy);
 	}
 	assert(m->reached_sim_limit());
 	assert(m->move_number() == 1);
-	assert(m->current_sims() == 11000);
+	assert(m->current_sims() == 10000);
+	assert(m->position() == p1);
+	m->set_sim_limit(1000000);
+	for (int i = 0; i < 10000; i++) // play 10k more moves
+	{
+		m->select(10, board, metadata);
+		m->update(0.0, dummy_policy);
+	}
+	assert(!m->reached_sim_limit());
+	assert(m->move_number() == 1);
+	assert(m->current_sims() == 20000);
 	assert(m->position() == p1);
 	delete m;
 
