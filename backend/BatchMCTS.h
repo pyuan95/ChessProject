@@ -74,6 +74,31 @@ public:
 		}
 	}
 
+	inline bool all_games_over() {
+		for (MCTS& m : arr) {
+			if (!m.isover())
+				return false;
+		}
+		return true;
+	}
+
+	inline double proportion_of_games_over() {
+		size_t cnt = 0;
+		for (MCTS& m : arr) {
+			cnt += (int) m.isover();
+		}
+		return cnt / ((double) arr.size());
+	}
+
+	// writes the results of the games to the given array
+	inline void results(Ndarray<int, 1> res) {
+		size_t x = 0;
+		for (MCTS& m : arr) {
+			res[x] = m.terminal_evaluation();
+			x++;
+		}
+	}
+
 	BatchMCTS(
 		int num_sims_per_move,
 		float temperature,
