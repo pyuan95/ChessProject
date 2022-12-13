@@ -4,8 +4,12 @@ import os
 from collections import defaultdict
 from numpyctypes import c_ndarray
 from numpy.ctypeslib import load_library
+from ctypes import *
 
 BatchMCTSExtension = load_library("extension_BatchMCTS", "../backend/output")
+BatchMCTSExtension.proportion_of_games_over.restype = c_float
+BatchMCTSExtension.all_games_over.restype = c_bool
+BatchMCTSExtension.current_sector.restype = c_int
 
 
 def generate_examples(lines):
@@ -100,21 +104,21 @@ class BatchMCTS:
     ) -> None:
         boards = c_ndarray(boards, dtype=int, ndim=len(boards.shape), shape=boards.shape)
         metadata = c_ndarray(metadata, dtype=int, ndim=len(metadata.shape), shape=metadata.shape)
-        output = bytes(output, encoding="utf8")
+        output = c_char_p(bytes(output, encoding="utf8"))
         self.ptr = BatchMCTSExtension.createBatchMCTS(
             num_sims_per_move,
-            temperature,
+            c_float(temperature),
             autoplay,
             output,
             num_threads,
             batch_size,
             num_sectors,
-            cpuct,
+            c_float(cpuct),
             boards,
             metadata,
         )
 
-    def __del__(self):
+    def cleanup(self) -> None:
         BatchMCTSExtension.deleteBatchMCTS(self.ptr)
 
     def select(self) -> None:
@@ -126,7 +130,7 @@ class BatchMCTS:
         BatchMCTSExtension.update(self.ptr, q, policy)
 
     def set_temperature(self, temp: float) -> None:
-        BatchMCTSExtension.set_temperature(self.ptr, temp)
+        BatchMCTSExtension.set_temperature(self.ptr, c_float(temp))
 
     def play_best_moves(self) -> None:
         BatchMCTSExtension.play_best_moves(self.ptr)

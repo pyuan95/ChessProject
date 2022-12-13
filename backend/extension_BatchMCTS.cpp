@@ -37,7 +37,7 @@ extern "C"
         BatchMCTS *createBatchMCTS(int num_sims_per_move,
                                    float temperature,
                                    bool autoplay,
-                                   string output,
+                                   char *output,
                                    int num_threads,
                                    int batch_size,
                                    int num_sectors,
