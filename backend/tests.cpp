@@ -173,7 +173,7 @@ void test_metadata() {
 	m->select(10, board, metadata);
 	m->update(0.0, dummy_policy);
 	assert(metadata[0] + metadata[1] + metadata[2] + metadata[3] == 4);
-	assert(metadata[4] == -1);
+	assert(metadata[4] == NO_SQUARE);
 
 	Position p;
 	p.play<WHITE>(Move("e2e3"));
@@ -190,7 +190,7 @@ void test_metadata() {
 	assert(metadata[1] == 1);
 	assert(metadata[2] == 0);
 	assert(metadata[3] == 1);
-	assert(metadata[4] == -1);
+	assert(metadata[4] == NO_SQUARE);
 	p.play<BLACK>(Move("e8f8"));
 	m->set_position(p);
 	m->select(10, board, metadata);
@@ -199,7 +199,7 @@ void test_metadata() {
 	assert(metadata[1] == 1);
 	assert(metadata[2] == 0);
 	assert(metadata[3] == 0);
-	assert(metadata[4] == -1);
+	assert(metadata[4] == NO_SQUARE);
 	p.play<WHITE>(Move("h2h4"));
 	p.play<BLACK>(Move("b8c6"));
 	p.play<WHITE>(Move("h4h5"));
@@ -228,7 +228,7 @@ void test_metadata() {
 	assert(metadata[1] == 0);
 	assert(metadata[2] == 0);
 	assert(metadata[3] == 1);
-	assert(metadata[4] == -1);
+	assert(metadata[4] == NO_SQUARE);
 	p.play<BLACK>(Move("c8d7"));
 	p.play<WHITE>(Move("c1d2"));
 
@@ -239,7 +239,7 @@ void test_metadata() {
 	assert(metadata[1] == 0);
 	assert(metadata[2] == 0);
 	assert(metadata[3] == 1); // p2 (white) has queen side castling
-	assert(metadata[4] == -1);
+	assert(metadata[4] == NO_SQUARE);
 
 	p.play<BLACK>(Move("d6h2"));
 	p.play<WHITE>(Move(e1, a1, MoveFlags(0b0011)));
@@ -250,7 +250,7 @@ void test_metadata() {
 	assert(metadata[1] == 0);
 	assert(metadata[2] == 0);
 	assert(metadata[3] == 0); // no more castling!
-	assert(metadata[4] == -1);
+	assert(metadata[4] == NO_SQUARE);
 	std::cout << p << "\n";
 }
 
@@ -897,7 +897,7 @@ void test_ndarray_copy() {
 
 void run_all_tests() {
 	// print_test(&batch_mcts_test, "batch mcts");
-	if (false) {
+	if (true) {
 		print_test(&test_metadata, "metadata test");
 		print_test(&promotion_test, "Promotion Test");
 		print_test(&test_ndarray_copy, "test ndarray copy");

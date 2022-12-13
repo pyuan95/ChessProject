@@ -104,8 +104,8 @@ inline void writePosition(const Position &p, Ndarray<int, 2> &board, Ndarray<int
 		std::swap(metadata[1], metadata[3]);
 		metadata[4] = 63 - metadata[4];
 	}
-	if (metadata[4] == NO_SQUARE) // no epsq
-		metadata[4] = -1;
+	if (metadata[4] == -1) // no epsq
+		metadata[4] = NO_SQUARE;
 }
 
 template <Color color>
@@ -142,8 +142,8 @@ inline void writePosition(const Position &p, int board[ROWS][COLS], int metadata
 		std::swap(metadata[1], metadata[3]);
 		metadata[4] = 63 - metadata[4];
 	}
-	if (metadata[4] == NO_SQUARE) // no epsq
-		metadata[4] = -1;
+	if (metadata[4] == -1) // no epsq
+		metadata[4] = NO_SQUARE;
 }
 
 void move2index(const Position &p, Move m, Color color, PolicyIndex &policyIndex);
