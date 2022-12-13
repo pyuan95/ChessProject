@@ -105,10 +105,13 @@ class BatchMCTS:
         cpuct: float,
         boards: np.ndarray,
         metadata: np.ndarray,
+        tablebase_path: str,
     ) -> None:
         boards = c_ndarray(boards, dtype=int, ndim=len(boards.shape), shape=boards.shape)
         metadata = c_ndarray(metadata, dtype=int, ndim=len(metadata.shape), shape=metadata.shape)
         output = c_char_p(bytes(output, encoding="utf8"))
+        tablebase_path = c_char_p(bytes(tablebase_path, encoding="utf8"))
+        BatchMCTSExtension.intiialize(tablebase_path)
         self.ptr = BatchMCTSExtension.createBatchMCTS(
             num_sims_per_move,
             c_float(temperature),

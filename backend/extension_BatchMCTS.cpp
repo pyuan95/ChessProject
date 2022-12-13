@@ -1,7 +1,7 @@
 #include <iostream>
 #include "ndarray.h"
 #include "BatchMCTS.h"
-
+#include "tablebase_evaluation.h"
 extern "C"
 {
     namespace
@@ -27,6 +27,15 @@ extern "C"
             std::cout << "test! " << test << "\n";
             std::cout << "x! " << x << "\n";
             return sum;
+        }
+
+        void initialize(char *tablebase_path)
+        {
+            init_rand();
+            initialise_all_databases();
+            zobrist::initialise_zobrist_keys();
+            init_move2index_cache();
+            init_tablebase(tablebase_path);
         }
 
         void deleteBatchMCTS(BatchMCTS *m)

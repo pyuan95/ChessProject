@@ -18,6 +18,7 @@ num_sectors: int = 1
 cpuct: float = 0.05
 boards: np.ndarray = np.zeros([num_sectors, batch_size, ROWS, COLS]).astype(int)
 metadata: np.ndarray = np.zeros([num_sectors, batch_size, METADATA_LENGTH]).astype(int)
+tablebase_path: str = "../backend/tablebase"
 
 # model settings
 num_layers = 4
@@ -41,6 +42,7 @@ batch_mcts = BatchMCTS(
     cpuct,
     boards.reshape([-1, ROWS, COLS]),
     metadata.reshape([-1, METADATA_LENGTH]),
+    tablebase_path,
 )
 
 model = ChessModel(num_layers, depth, d_fnn)

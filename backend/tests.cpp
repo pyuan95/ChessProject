@@ -920,12 +920,61 @@ void test_ndarray_copy()
 	}
 }
 
+void tablebase_test()
+{
+	int SIMS = 5;
+	float CPUCT = 0.01f;
+	MCTS *m = new MCTS(SIMS, CPUCT, true);
+	Position position;
+	Position::set("5k2/8/8/8/8/8/3KR3/8 w - - 0 1", position);
+	m->set_position(position);
+	Ndarray<float, 3>
+	dummy_policy(
+		new float[ROWS * COLS * MOVES_PER_SQUARE],
+		new long[3]{ROWS, COLS, MOVES_PER_SQUARE},
+		new long[3]{COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
+	Ndarray<int, 2> board(
+		new int[ROWS * COLS],
+		new long[2]{ROWS, COLS},
+		new long[2]{COLS, 1});
+
+	Ndarray<int, 1> metadata(
+		new int[METADATA_LENGTH],
+		new long[1]{METADATA_LENGTH},
+		new long[1]{1});
+
+	for (int r = 0; r < ROWS; r++)
+	{
+		for (int c = 0; c < COLS; c++)
+		{
+			for (int i = 0; i < MOVES_PER_SQUARE; i++)
+				dummy_policy[r][c][i] = 0.10f;
+		}
+	}
+	assert(m->game_number() == 1);
+	for (int z = 0; z < 5; z++)
+	{
+		m->select(CPUCT, board, metadata);
+		m->update(0.00, dummy_policy);
+	}
+	// should have auto-played cuz it's in the tablebase!
+	assert(m->game_number() == 2);
+	for (int z = 0; z < 5; z++)
+	{
+		m->select(CPUCT, board, metadata);
+		m->update(0.00, dummy_policy);
+	}
+	// restarted game; should play new move but not new game!
+	assert(m->game_number() == 2);
+}
+
 void run_all_tests()
 {
 	// print_test(&batch_mcts_test, "batch mcts");
-	print_test(&policy_completeness_test, "Policy Completeness Test");
-	if (false)
+	if (true)
 	{
+		print_test(&tablebase_test, "Tablebase Test");
+		print_test(&policy_completeness_test, "Policy Completeness Test");
 		print_test(&test_metadata, "metadata test");
 		print_test(&promotion_test, "Promotion Test");
 		print_test(&test_ndarray_copy, "test ndarray copy");
@@ -941,6 +990,6 @@ void run_all_tests()
 		print_test(&policy_completeness_test, "Policy Completeness Test");
 		print_test(&policy_rotation_test, "Policy Rotation Test");
 		print_test(&select_and_update_no_errors, "Select and Update no Errors Test");
-		print_test(&memory_test, "Memory Test");
+		// print_test(&memory_test, "Memory Test");
 	}
 }

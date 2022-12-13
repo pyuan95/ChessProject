@@ -21,6 +21,8 @@ files = [
     "tests.cpp",
     "types.cpp",
     "extension_BatchMCTS.cpp",
+    "tbprobe.cpp",
+    "tablebase_evaluation.cpp",
 ]
 files = [f.replace(".cpp", "") for f in files]
 for f in files:
