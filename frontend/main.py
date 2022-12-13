@@ -104,6 +104,7 @@ def train(loopidx):
             loss += tf.reduce_sum([tf.nn.l2_loss(v) for v in model.trainable_variables]) * regularization_weight
         grads = tape.gradient(loss, model.trainable_weights)
         optimizer.apply_gradients(zip(grads, model.trainable_weights))
+    delete_finished_games(output_directory)
     p("finished train loop {0}! loss was {1}".format(loopidx, train_loss.result().numpy()))
 
 
