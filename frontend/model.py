@@ -27,7 +27,7 @@ def layer_norm(t: tf.Tensor):
     mu = tf.reduce_mean(t, axis=2)  # e[x] shape=(batch size, seq_len)
     sigma = tf.reduce_mean(t * t, axis=2)  # e[x^2] shape=(batch size, seq_len)
     sigma = tf.sqrt(sigma - mu * mu)  # std dev of x
-    return (t - mu[..., 1]) / sigma[..., 1]
+    return (t - mu[..., None]) / sigma[..., None]
 
 
 class ChessModelLayer(tf.keras.layers.Layer):
@@ -37,6 +37,7 @@ class ChessModelLayer(tf.keras.layers.Layer):
         :param depth: depth of the layer
         :param d_ffn: depth of the feed forward network
         """
+        super(ChessModelLayer, self).__init__()
         self.keys = tf.keras.layers.Dense(depth)
         self.queries = tf.keras.layers.Dense(depth)
         self.values = tf.keras.layers.Dense(depth)

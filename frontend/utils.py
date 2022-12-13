@@ -22,6 +22,7 @@ def generate_examples(lines):
         board = l1[: ROWS * COLS]
         metadata = l1[ROWS * COLS :]
         policy = np.zeros([ROWS, COLS, NUM_MOVES_PER_SQUARE])
+        legal_moves = np.zeros([ROWS, COLS, NUM_MOVES_PER_SQUARE])
         moves = lines[i + 1].split(",")[:-1]
         color = lines[i + 3].strip("\n")
         for j in range(0, len(moves), 4):
@@ -30,11 +31,13 @@ def generate_examples(lines):
             i = int(moves[j + 2])
             p = float(moves[j + 3])
             policy[r, c, i] = p
+            legal_moves[r, c, i] = 1
         yield {
             "board": board,
             "metadata": metadata,
             "policy": policy,
             "value": value if color == "WHITE" else value * -1,
+            "legal moves": legal_moves,
         }
 
 
@@ -75,8 +78,9 @@ def generate_batches_from_directory(dir, batch_size):
         board = np.concatenate([x["board"][None, ...] for x in res], axis=0)
         metadata = np.concatenate([x["metadata"][None, ...] for x in res], axis=0)
         policy = np.concatenate([x["policy"][None, ...] for x in res], axis=0)
+        legal_moves = np.concatenate([x["legal moves"][None, ...] for x in res], axis=0)
         value = np.array([x["value"] for x in res])
-        return {"board": board, "metadata": metadata, "policy": policy, "value": value}
+        return {"board": board, "metadata": metadata, "policy": policy, "value": value, "legal moves": legal_moves}
 
     for example in generate_examples_from_directory(dir):
         res.append(example)
