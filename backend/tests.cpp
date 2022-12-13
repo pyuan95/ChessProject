@@ -6,14 +6,16 @@
 #include <unordered_set>
 #include "BatchMCTS.h"
 
-template<Color color>
-static bool writeLegalMoves(Position& p, int moves[ROWS][COLS][MOVES_PER_SQUARE], bool fillzeros) {
+template <Color color>
+static bool writeLegalMoves(Position &p, int moves[ROWS][COLS][MOVES_PER_SQUARE], bool fillzeros)
+{
 	MoveList<color> l(p);
 	if (l.size() == 0) // no moves available, this is a terminal position.
 		return false;
 
 	PolicyIndex i;
-	for (Move m : l) {
+	for (Move m : l)
+	{
 		move2index(p, m, color, i);
 		moves[i.r][i.c][i.i] = 1;
 	}
@@ -32,24 +34,28 @@ static bool writeLegalMoves(Position& p, int moves[ROWS][COLS][MOVES_PER_SQUARE]
 	return true;
 }
 
-void test_move_set() {
+void test_move_set()
+{
 	MCTSNode m(WHITE);
 	Position p;
 	MoveList<WHITE> moves(p);
 	unordered_set<uint16_t> stored_moves;
-	for (Move m : moves) {
+	for (Move m : moves)
+	{
 		stored_moves.insert(m.get_representation());
 	}
 	std::vector<std::pair<Move, float>> leaves(218, pair<Move, float>(0, 0.0f));
 	Ndarray<float, 3> policy = Ndarray<float, 3>(
 		new float[ROWS * COLS * MOVES_PER_SQUARE](),
-		new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
-		new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
-	);
+		new long[3]{ROWS, COLS, MOVES_PER_SQUARE},
+		new long[3]{COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
 
-	for (int i = 0; i < ROWS; i++) {
-		for (int j = 0; j < COLS; j++) {
-			for (int k = 0; k < MOVES_PER_SQUARE; k++) {
+	for (int i = 0; i < ROWS; i++)
+	{
+		for (int j = 0; j < COLS; j++)
+		{
+			for (int k = 0; k < MOVES_PER_SQUARE; k++)
+			{
 				policy[i][j][k] = 10.0f * std::rand() / RAND_MAX;
 			}
 		}
@@ -60,8 +66,9 @@ void test_move_set() {
 
 	uint8_t prev = 0xff;
 	float tot = 0;
-	for (int i = 0; i < m.get_num_children(); i++) {
-		Move stored(((uint16_t*)(m.begin_children() + i * 3L))[0]);
+	for (int i = 0; i < m.get_num_children(); i++)
+	{
+		Move stored(((uint16_t *)(m.begin_children() + i * 3L))[0]);
 		uint8_t prob((m.begin_children() + i * 3L)[2]);
 		assert(prev >= prob);
 		prev = prob;
@@ -73,7 +80,8 @@ void test_move_set() {
 	assert(stored_moves.empty());
 }
 
-void testMCTSbitlogic() {
+void testMCTSbitlogic()
+{
 	float prob = 0.32f;
 	Move m = Move();
 	MCTSNode n(WHITE);
@@ -89,7 +97,8 @@ void testMCTSbitlogic() {
 	assert(n.is_terminal_position());
 }
 
-void test_prio_queue() {
+void test_prio_queue()
+{
 	PriorityQueue<int> q;
 	q.push(5, 5.0);
 	q.push(6, 6.0);
@@ -116,41 +125,39 @@ void print_test(void (*func)(), string name)
 	cout << "running test: " << name << " completed\n\n";
 }
 
-
-void rotation_test() {
+void rotation_test()
+{
 	Position p1;
 	Position p2;
 	Position::set("rnbkqbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBKQBNR w - - 0 1", p2);
 	// cout << "SIZE: " << sizeof(p1);
 	Ndarray<int, 2> board1(
 		new int[ROWS * COLS],
-		new long[2]{ ROWS, COLS },
-		new long[2]{ COLS, 1 }
-	);
+		new long[2]{ROWS, COLS},
+		new long[2]{COLS, 1});
 	Ndarray<int, 2> board2(
 		new int[ROWS * COLS],
-		new long[2]{ ROWS, COLS },
-		new long[2]{ COLS, 1 }
-	);
+		new long[2]{ROWS, COLS},
+		new long[2]{COLS, 1});
 	Ndarray<int, 1> metadata(
 		new int[METADATA_LENGTH],
-		new long[1]{ METADATA_LENGTH },
-		new long[1]{ 1 }
-	);
+		new long[1]{METADATA_LENGTH},
+		new long[1]{1});
 	writePosition<WHITE>(p1, board1, metadata);
 	writePosition<BLACK>(p2, board2, metadata);
-	for (int i = 0; i < 64; i++) {
+	for (int i = 0; i < 64; i++)
+	{
 		assert(board1[i >> 3][i & 7] == board2[i >> 3][i & 7]);
 	}
 }
 
-void test_metadata() {
-	MCTS* m = new MCTS(10000, 0, false);
+void test_metadata()
+{
+	MCTS *m = new MCTS(10000, 0, false);
 	Ndarray<float, 3> dummy_policy(
 		new float[ROWS * COLS * MOVES_PER_SQUARE],
-		new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
-		new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
-	);
+		new long[3]{ROWS, COLS, MOVES_PER_SQUARE},
+		new long[3]{COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
 	for (int r = 0; r < ROWS; r++)
 	{
 		for (int c = 0; c < COLS; c++)
@@ -161,15 +168,13 @@ void test_metadata() {
 	}
 	Ndarray<int, 2> board(
 		new int[ROWS * COLS],
-		new long[2]{ ROWS, COLS },
-		new long[2]{ COLS, 1 }
-	);
+		new long[2]{ROWS, COLS},
+		new long[2]{COLS, 1});
 
 	Ndarray<int, 1> metadata(
 		new int[METADATA_LENGTH],
-		new long[1]{ METADATA_LENGTH },
-		new long[1]{ 1 }
-	);
+		new long[1]{METADATA_LENGTH},
+		new long[1]{1});
 	m->select(10, board, metadata);
 	m->update(0.0, dummy_policy);
 	assert(metadata[0] + metadata[1] + metadata[2] + metadata[3] == 4);
@@ -254,27 +259,30 @@ void test_metadata() {
 	std::cout << p << "\n";
 }
 
-void policy_rotation_test() {
+void policy_rotation_test()
+{
 	Position p1;
 	Position p2;
 	Position::set("rnbkqbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBKQBNR w - - 0 1", p2);
-	int policyone[8][8][73] = { {{0}} };
-	int policytwo[8][8][73] = {{ {0} }};
+	int policyone[8][8][73] = {{{0}}};
+	int policytwo[8][8][73] = {{{0}}};
 	writeLegalMoves<WHITE>(p1, policyone, false);
 	writeLegalMoves<BLACK>(p2, policytwo, false);
 	for (int r = 0; r < 8; r++)
 	{
 		for (int c = 0; c < 8; c++)
 		{
-			for (int i = 0; i < 73; i++) {
+			for (int i = 0; i < 73; i++)
+			{
 				assert(policyone[r][c][i] == policytwo[r][c][i]);
 			}
 		}
 	}
 }
 
-void policy_completeness_test() {
-	int count[MOVES_PER_SQUARE] = { 0 };
+void policy_completeness_test()
+{
+	int count[MOVES_PER_SQUARE] = {0};
 	vector<Position> p;
 	for (int i = 0; i < 5; i++)
 		p.push_back(Position());
@@ -283,6 +291,16 @@ void policy_completeness_test() {
 	Position::set("B7/8/8/8/8/8/8/8 w - - 0 1", p[2]);
 	Position::set("8/8/8/8/8/8/8/7B w - - 0 1", p[3]);
 	Position::set("8/8/8/3N4/8/8/8/8 w - - 0 1", p[4]);
+
+	Position bruh = Position();
+	std::cout
+		<< bruh.fen() << "\n";
+	bruh.play<WHITE>(Move(e2, e4, DOUBLE_PUSH));
+	std::cout
+		<< bruh.fen() << "\n";
+	std::cout
+		<< p[0].fen() << "\n";
+
 	for (Position pos : p)
 	{
 		// cout << pos << "\n";
@@ -294,7 +312,8 @@ void policy_completeness_test() {
 			count[pi.i] += 1;
 		}
 	}
-	for (int i = 0; i < 64; i++) {
+	for (int i = 0; i < 64; i++)
+	{
 		// cout << i << "\n";
 		// cout << count[i] << "\n\n";
 		assert(count[i] == 1);
@@ -330,7 +349,7 @@ void policy_completeness_test() {
 	assert(tot == 12);
 
 	// finally test the float_t pawn push
-	
+
 	Position::set("8/8/8/8/8/8/3P4/8 w - - 0 1", pawn_pos);
 	for (Move m : MoveList<WHITE>(pawn_pos))
 	{
@@ -342,14 +361,14 @@ void policy_completeness_test() {
 	assert(count[1] == 1); // float_t push
 }
 
-void select_and_update_no_errors() {
+void select_and_update_no_errors()
+{
 	Position p1;
-	MCTS* m = new MCTS(10000, 0, false);
+	MCTS *m = new MCTS(10000, 0, false);
 	Ndarray<float, 3> dummy_policy(
 		new float[ROWS * COLS * MOVES_PER_SQUARE],
-		new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
-		new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
-	);
+		new long[3]{ROWS, COLS, MOVES_PER_SQUARE},
+		new long[3]{COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
 	for (int r = 0; r < ROWS; r++)
 	{
 		for (int c = 0; c < COLS; c++)
@@ -360,15 +379,13 @@ void select_and_update_no_errors() {
 	}
 	Ndarray<int, 2> board(
 		new int[ROWS * COLS],
-		new long[2]{ ROWS, COLS },
-		new long[2]{ COLS, 1 }
-	);
+		new long[2]{ROWS, COLS},
+		new long[2]{COLS, 1});
 
 	Ndarray<int, 1> metadata(
 		new int[METADATA_LENGTH],
-		new long[1]{ METADATA_LENGTH },
-		new long[1]{ 1 }
-	);
+		new long[1]{METADATA_LENGTH},
+		new long[1]{1});
 	int x = 0;
 	for (int i = 0; i < 1000; i++)
 	{
@@ -417,19 +434,19 @@ void select_and_update_no_errors() {
 
 bool comp(pair<Move, float_t> x, pair<Move, float_t> y) { return x.second > y.second; } // we want to sort in reverse order.
 
-void select_best_move_test() {
+void select_best_move_test()
+{
 	const int SIMS = 100000;
 	const float_t CPUCT = 0.5; // pretty wide search!
 
-	MCTS* m = new MCTS(SIMS, 1.0, false);
+	MCTS *m = new MCTS(SIMS, 1.0, false);
 	Position p;
 	Position::set("2r3k1/1b3pp1/p3p2p/2b1P2P/5PPK/1NPr4/PP1p4/3R1R2 b - - 0 1", p);
 	m->set_position(p);
 	Ndarray<float, 3> dummy_policy(
 		new float[ROWS * COLS * MOVES_PER_SQUARE],
-		new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
-		new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
-	);
+		new long[3]{ROWS, COLS, MOVES_PER_SQUARE},
+		new long[3]{COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
 	for (int r = 0; r < ROWS; r++)
 	{
 		for (int c = 0; c < COLS; c++)
@@ -441,16 +458,15 @@ void select_best_move_test() {
 
 	Ndarray<int, 2> board(
 		new int[ROWS * COLS],
-		new long[2]{ ROWS, COLS },
-		new long[2]{ COLS, 1 }
-	);
+		new long[2]{ROWS, COLS},
+		new long[2]{COLS, 1});
 	Ndarray<int, 1> metadata(
 		new int[METADATA_LENGTH],
-		new long[1]{ METADATA_LENGTH },
-		new long[1]{ 1 }
-	);
+		new long[1]{METADATA_LENGTH},
+		new long[1]{1});
 	bool is_terminal = false;
-	while (m->current_sims() < SIMS) {
+	while (m->current_sims() < SIMS)
+	{
 		bool term = m->select(CPUCT, board, metadata);
 		is_terminal = term || is_terminal;
 		m->update(0.00, dummy_policy);
@@ -473,21 +489,21 @@ void select_best_move_test() {
 	// std::cout << (m->turn() ? "BLACK" : "WHITE") << "'s Q evaluation: " << m->evaluation() << "\n";
 	// std::cout << (m->turn() ? "BLACK" : "WHITE") << "'s minimax evaluation: " << m->minimax_evaluation() << "\n";
 	assert(m->get_best_move(0.1f).from() == b7); // assert that we found the move that leads to mate in 5.
-	// assert(m->get_best_move(0.1f).to() == g2); 
+	// assert(m->get_best_move(0.1f).to() == g2);
 	delete m;
 }
 
-void autoplay_test() {
+void autoplay_test()
+{
 	const int SIMS = 250;
 	const float_t CPUCT = 0.5; // pretty wide search!
 
-	MCTS* m = new MCTS(SIMS, 1.0, true);
+	MCTS *m = new MCTS(SIMS, 1.0, true);
 	Position p;
 	Ndarray<float, 3> dummy_policy(
 		new float[ROWS * COLS * MOVES_PER_SQUARE],
-		new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
-		new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
-	);
+		new long[3]{ROWS, COLS, MOVES_PER_SQUARE},
+		new long[3]{COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
 
 	for (int r = 0; r < ROWS; r++)
 	{
@@ -500,18 +516,18 @@ void autoplay_test() {
 
 	Ndarray<int, 2> board(
 		new int[ROWS * COLS],
-		new long[2]{ ROWS, COLS },
-		new long[2]{ COLS, 1 }
-	);
+		new long[2]{ROWS, COLS},
+		new long[2]{COLS, 1});
 
 	Ndarray<int, 1> metadata(
 		new int[METADATA_LENGTH],
-		new long[1]{ METADATA_LENGTH },
-		new long[1]{ 1 }
-	);
+		new long[1]{METADATA_LENGTH},
+		new long[1]{1});
 
-	for (int i = 0; i < 1000; i++) {
-		for (int j = 0; j < SIMS; j++) {
+	for (int i = 0; i < 1000; i++)
+	{
+		for (int j = 0; j < SIMS; j++)
+		{
 			m->select(CPUCT, board, metadata);
 			m->update(0.00, dummy_policy);
 		}
@@ -523,20 +539,20 @@ void autoplay_test() {
 	delete m;
 }
 
-void promotion_test() {
+void promotion_test()
+{
 	const int SIMS = 10000;
 	const float_t CPUCT = 0.5; // pretty wide search!
 
-	MCTS* m = new MCTS(SIMS, 1.0, false);
+	MCTS *m = new MCTS(SIMS, 1.0, false);
 	Position p;
 	Position::set("6k1/8/8/8/8/8/8/R3K2R w KQ - 0 1", p);
 	std::cout << p << "\n";
 	m->set_position(p);
 	Ndarray<float, 3> dummy_policy(
 		new float[ROWS * COLS * MOVES_PER_SQUARE],
-		new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
-		new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
-	);
+		new long[3]{ROWS, COLS, MOVES_PER_SQUARE},
+		new long[3]{COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
 	for (int r = 0; r < ROWS; r++)
 	{
 		for (int c = 0; c < COLS; c++)
@@ -548,17 +564,16 @@ void promotion_test() {
 
 	Ndarray<int, 2> board(
 		new int[ROWS * COLS],
-		new long[2]{ ROWS, COLS },
-		new long[2]{ COLS, 1 }
-	);
+		new long[2]{ROWS, COLS},
+		new long[2]{COLS, 1});
 
 	Ndarray<int, 1> metadata(
 		new int[METADATA_LENGTH],
-		new long[1]{ METADATA_LENGTH },
-		new long[1]{ 1 }
-	);
+		new long[1]{METADATA_LENGTH},
+		new long[1]{1});
 
-	while (m->current_sims() < SIMS) {
+	while (m->current_sims() < SIMS)
+	{
 		m->select(CPUCT, board, metadata);
 		m->update(0.00, dummy_policy);
 		if (m->current_sims() % 100000 == 0)
@@ -580,16 +595,17 @@ void promotion_test() {
 	delete m;
 }
 
-void memory_test() {
-	for (int abc = 0; abc < 3; abc++) {
+void memory_test()
+{
+	for (int abc = 0; abc < 3; abc++)
+	{
 		int SIMS = 1000000;
 		float CPUCT = 0.01f;
-		MCTS* m = new MCTS(1000000, 1.0, false);
+		MCTS *m = new MCTS(1000000, 1.0, false);
 		Ndarray<float, 3> dummy_policy(
 			new float[ROWS * COLS * MOVES_PER_SQUARE],
-			new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
-			new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
-		);
+			new long[3]{ROWS, COLS, MOVES_PER_SQUARE},
+			new long[3]{COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
 		for (int r = 0; r < ROWS; r++)
 		{
 			for (int c = 0; c < COLS; c++)
@@ -601,17 +617,16 @@ void memory_test() {
 
 		Ndarray<int, 2> board(
 			new int[ROWS * COLS],
-			new long[2]{ ROWS, COLS },
-			new long[2]{ COLS, 1 }
-		);
+			new long[2]{ROWS, COLS},
+			new long[2]{COLS, 1});
 
 		Ndarray<int, 1> metadata(
 			new int[METADATA_LENGTH],
-			new long[1]{ METADATA_LENGTH },
-			new long[1]{ 1 }
-		);
+			new long[1]{METADATA_LENGTH},
+			new long[1]{1});
 
-		while (m->current_sims() < SIMS) {
+		while (m->current_sims() < SIMS)
+		{
 			m->select(CPUCT, board, metadata);
 			m->update(0.00, dummy_policy);
 			if (m->current_sims() % 100000 == 0)
@@ -625,15 +640,15 @@ void memory_test() {
 	}
 }
 
-void test_next_move_randomness() {
+void test_next_move_randomness()
+{
 	int SIMS = 100000;
 	float CPUCT = 0.01f;
-	MCTS* m = new MCTS(1000000, 1.0, false);
+	MCTS *m = new MCTS(1000000, 1.0, false);
 	Ndarray<float, 3> dummy_policy(
 		new float[ROWS * COLS * MOVES_PER_SQUARE],
-		new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
-		new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
-	);
+		new long[3]{ROWS, COLS, MOVES_PER_SQUARE},
+		new long[3]{COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
 	for (int r = 0; r < ROWS; r++)
 	{
 		for (int c = 0; c < COLS; c++)
@@ -645,23 +660,23 @@ void test_next_move_randomness() {
 
 	Ndarray<int, 2> board(
 		new int[ROWS * COLS],
-		new long[2]{ ROWS, COLS },
-		new long[2]{ COLS, 1 }
-	);
+		new long[2]{ROWS, COLS},
+		new long[2]{COLS, 1});
 
 	Ndarray<int, 1> metadata(
 		new int[METADATA_LENGTH],
-		new long[1]{ METADATA_LENGTH },
-		new long[1]{ 1 }
-	);
+		new long[1]{METADATA_LENGTH},
+		new long[1]{1});
 
-	while (m->current_sims() < SIMS) {
+	while (m->current_sims() < SIMS)
+	{
 		m->select(CPUCT, board, metadata);
 		m->update(0.00f, dummy_policy);
 	}
 
 	unordered_set<uint16_t> captured_moves;
-	for (unsigned int i = 0; i < 1000000; i++) {
+	for (unsigned int i = 0; i < 1000000; i++)
+	{
 		captured_moves.insert(m->get_best_move(1.0).get_representation());
 	}
 	Position pos;
@@ -669,26 +684,24 @@ void test_next_move_randomness() {
 	delete m;
 }
 
-void test_updated_q() {
+void test_updated_q()
+{
 	int SIMS = 1000000;
 	float CPUCT = 0.01f;
-	MCTS* m = new MCTS(1000000, 1.0, false);
+	MCTS *m = new MCTS(1000000, 1.0, false);
 	Ndarray<float, 3> dummy_policy(
 		new float[ROWS * COLS * MOVES_PER_SQUARE],
-		new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
-		new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
-	);
+		new long[3]{ROWS, COLS, MOVES_PER_SQUARE},
+		new long[3]{COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
 	Ndarray<int, 2> board(
 		new int[ROWS * COLS],
-		new long[2]{ ROWS, COLS },
-		new long[2]{ COLS, 1 }
-	);
+		new long[2]{ROWS, COLS},
+		new long[2]{COLS, 1});
 
 	Ndarray<int, 1> metadata(
 		new int[METADATA_LENGTH],
-		new long[1]{ METADATA_LENGTH },
-		new long[1]{ 1 }
-	);
+		new long[1]{METADATA_LENGTH},
+		new long[1]{1});
 
 	for (int r = 0; r < ROWS; r++)
 	{
@@ -708,7 +721,8 @@ void test_updated_q() {
 	delete m;
 }
 
-void test_select_best_move_correctly() {
+void test_select_best_move_correctly()
+{
 	MCTSNode m(WHITE);
 	Position p;
 	MoveList<WHITE> moves(p);
@@ -716,35 +730,37 @@ void test_select_best_move_correctly() {
 	std::vector<std::pair<Move, float>> leaves(218, pair<Move, float>(0, 0.0f));
 	Ndarray<float, 3> policy = Ndarray<float, 3>(
 		new float[ROWS * COLS * MOVES_PER_SQUARE](),
-		new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
-		new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
-	);
+		new long[3]{ROWS, COLS, MOVES_PER_SQUARE},
+		new long[3]{COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
 
-	for (int i = 0; i < ROWS; i++) {
-		for (int j = 0; j < COLS; j++) {
-			for (int k = 0; k < MOVES_PER_SQUARE; k++) {
+	for (int i = 0; i < ROWS; i++)
+	{
+		for (int j = 0; j < COLS; j++)
+		{
+			for (int k = 0; k < MOVES_PER_SQUARE; k++)
+			{
 				policy[i][j][k] = 10.0f * std::rand() / RAND_MAX;
 			}
 		}
 	}
 
 	m.expand(p, policy, moves.begin(), moves.size(), leaves);
-	std::pair<MCTSNode*, Move> child(0, 0);
+	std::pair<MCTSNode *, Move> child(0, 0);
 	m.select_best_child(0.01f, child);
 	child.first->backup(-100.0f); // really good for us now
-	MCTSNode* prev_best = child.first;
+	MCTSNode *prev_best = child.first;
 	m.select_best_child(0.01f, child);
 	assert(child.first == prev_best);
 
 	child.first->backup(1000); // now really bad for us; next node should be a new one;
 	prev_best = child.first;
 	m.select_best_child(0.01f, child);
-	assert(child.first == ((MCTSNode*) m.begin_nodes()) + 1);
+	assert(child.first == ((MCTSNode *)m.begin_nodes()) + 1);
 
 	child.first->backup(1000); // now really bad for us; next node should be a new one;
 	prev_best = child.first;
 	m.select_best_child(0.01f, child);
-	assert(child.first == ((MCTSNode*)m.begin_nodes()) + 2);
+	assert(child.first == ((MCTSNode *)m.begin_nodes()) + 2);
 
 	child.first->backup(-1000); // now really good for us; next node should be the same one;
 	prev_best = child.first;
@@ -754,7 +770,8 @@ void test_select_best_move_correctly() {
 	assert(child.first == prev_best);
 }
 
-void batch_mcts_test() {
+void batch_mcts_test()
+{
 	int iterations = 1000000;
 	int num_sims_per_move = 500;
 	float temperature = 1.0;
@@ -768,32 +785,32 @@ void batch_mcts_test() {
 
 	Ndarray<int, 3> boards(
 		new int[batch_size * num_sectors * ROWS * COLS],
-		new long[3]{ batch_size * num_sectors, ROWS, COLS },
-		new long[3]{ ROWS * COLS, COLS, 1 }
-	);
+		new long[3]{batch_size * num_sectors, ROWS, COLS},
+		new long[3]{ROWS * COLS, COLS, 1});
 
 	Ndarray<float, 4> policy(
 		new float[batch_size * ROWS * COLS * MOVES_PER_SQUARE](),
-		new long[4]{ batch_size, ROWS, COLS, MOVES_PER_SQUARE },
-		new long[4]{ ROWS * COLS * MOVES_PER_SQUARE, COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
-	);
+		new long[4]{batch_size, ROWS, COLS, MOVES_PER_SQUARE},
+		new long[4]{ROWS * COLS * MOVES_PER_SQUARE, COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
 
 	Ndarray<float, 1> q(
 		new float[batch_size],
-		new long[1]{ batch_size },
-		new long[1]{ 1 }
-	);
+		new long[1]{batch_size},
+		new long[1]{1});
 
 	Ndarray<int, 2> metadata(
 		new int[batch_size * num_sectors * METADATA_LENGTH],
-		new long[2]{ batch_size * num_sectors, METADATA_LENGTH },
-		new long[2]{ METADATA_LENGTH, 1 }
-	);
+		new long[2]{batch_size * num_sectors, METADATA_LENGTH},
+		new long[2]{METADATA_LENGTH, 1});
 
-	for (int a = 0; a < batch_size; a++) {
-		for (int i = 0; i < ROWS; i++) {
-			for (int j = 0; j < COLS; j++) {
-				for (int k = 0; k < MOVES_PER_SQUARE; k++) {
+	for (int a = 0; a < batch_size; a++)
+	{
+		for (int i = 0; i < ROWS; i++)
+		{
+			for (int j = 0; j < COLS; j++)
+			{
+				for (int k = 0; k < MOVES_PER_SQUARE; k++)
+				{
 					policy[a][i][j][k] = 10.0f * std::rand() / RAND_MAX;
 				}
 			}
@@ -801,13 +818,13 @@ void batch_mcts_test() {
 	}
 
 	BatchMCTS m(
-		num_sims_per_move, temperature, autoplay, output, num_threads, batch_size, num_sectors, cpuct, boards, metadata
-	);
+		num_sims_per_move, temperature, autoplay, output, num_threads, batch_size, num_sectors, cpuct, boards, metadata);
 
 	using namespace std;
 	using namespace std::chrono;
 	auto start = high_resolution_clock::now();
-	for (int i = 0; i < iterations; i++) {
+	for (int i = 0; i < iterations; i++)
+	{
 		// std::cout << i << "\n";
 		m.select();
 		m.update(q, policy);
@@ -821,34 +838,35 @@ void batch_mcts_test() {
 
 	int SIMS = 1000000;
 	float CPUCT = 0.01f;
-	MCTS* mcts = new MCTS(1000000, 1.0, false);
+	MCTS *mcts = new MCTS(1000000, 1.0, false);
 	Ndarray<float, 3> dummy_policy(
 		new float[ROWS * COLS * MOVES_PER_SQUARE],
-		new long[3]{ ROWS, COLS, MOVES_PER_SQUARE },
-		new long[3]{ COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
-	);
+		new long[3]{ROWS, COLS, MOVES_PER_SQUARE},
+		new long[3]{COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
 	Ndarray<int, 2> board_baseline(
 		new int[ROWS * COLS],
-		new long[2]{ ROWS, COLS },
-		new long[2]{ COLS, 1 }
-	);
+		new long[2]{ROWS, COLS},
+		new long[2]{COLS, 1});
 
 	Ndarray<int, 1> metadata_baseline(
 		new int[METADATA_LENGTH],
-		new long[1]{ METADATA_LENGTH },
-		new long[1]{ 1 }
-	);
+		new long[1]{METADATA_LENGTH},
+		new long[1]{1});
 
-	for (int i = 0; i < ROWS; i++) {
-		for (int j = 0; j < COLS; j++) {
-			for (int k = 0; k < MOVES_PER_SQUARE; k++) {
+	for (int i = 0; i < ROWS; i++)
+	{
+		for (int j = 0; j < COLS; j++)
+		{
+			for (int k = 0; k < MOVES_PER_SQUARE; k++)
+			{
 				dummy_policy[i][j][k] = 10.0f * std::rand() / RAND_MAX;
 			}
 		}
 	}
 
 	start = high_resolution_clock::now();
-	for (int i = 0; i < 100000; i++) {
+	for (int i = 0; i < 100000; i++)
+	{
 		mcts->select(CPUCT, board_baseline, metadata_baseline);
 		mcts->update(0.0f, dummy_policy);
 	}
@@ -857,25 +875,28 @@ void batch_mcts_test() {
 	cout << "baseline speed: " << 1000.0f * 100000 / duration.count() << " sims per second\n";
 }
 
-void test_ndarray_copy() {
+void test_ndarray_copy()
+{
 	int batch_size = 100;
 
 	Ndarray<float, 4> policy(
 		new float[batch_size * ROWS * COLS * MOVES_PER_SQUARE](),
-		new long[4]{ batch_size, ROWS, COLS, MOVES_PER_SQUARE },
-		new long[4]{ ROWS * COLS * MOVES_PER_SQUARE, COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
-	);
+		new long[4]{batch_size, ROWS, COLS, MOVES_PER_SQUARE},
+		new long[4]{ROWS * COLS * MOVES_PER_SQUARE, COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
 
 	Ndarray<float, 4> policy2(
 		new float[batch_size * ROWS * COLS * MOVES_PER_SQUARE](),
-		new long[4]{ batch_size, ROWS, COLS, MOVES_PER_SQUARE },
-		new long[4]{ ROWS * COLS * MOVES_PER_SQUARE, COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1 }
-	);
+		new long[4]{batch_size, ROWS, COLS, MOVES_PER_SQUARE},
+		new long[4]{ROWS * COLS * MOVES_PER_SQUARE, COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
 
-	for (int a = 0; a < batch_size; a++) {
-		for (int i = 0; i < ROWS; i++) {
-			for (int j = 0; j < COLS; j++) {
-				for (int k = 0; k < MOVES_PER_SQUARE; k++) {
+	for (int a = 0; a < batch_size; a++)
+	{
+		for (int i = 0; i < ROWS; i++)
+		{
+			for (int j = 0; j < COLS; j++)
+			{
+				for (int k = 0; k < MOVES_PER_SQUARE; k++)
+				{
 					policy[a][i][j][k] = 10.0f * std::rand() / RAND_MAX;
 				}
 			}
@@ -884,10 +905,14 @@ void test_ndarray_copy() {
 
 	policy2.copy(policy);
 
-	for (int a = 0; a < batch_size; a++) {
-		for (int i = 0; i < ROWS; i++) {
-			for (int j = 0; j < COLS; j++) {
-				for (int k = 0; k < MOVES_PER_SQUARE; k++) {
+	for (int a = 0; a < batch_size; a++)
+	{
+		for (int i = 0; i < ROWS; i++)
+		{
+			for (int j = 0; j < COLS; j++)
+			{
+				for (int k = 0; k < MOVES_PER_SQUARE; k++)
+				{
 					assert(policy[a][i][j][k] == policy2[a][i][j][k]);
 				}
 			}
@@ -895,9 +920,12 @@ void test_ndarray_copy() {
 	}
 }
 
-void run_all_tests() {
+void run_all_tests()
+{
 	// print_test(&batch_mcts_test, "batch mcts");
-	if (true) {
+	print_test(&policy_completeness_test, "Policy Completeness Test");
+	if (false)
+	{
 		print_test(&test_metadata, "metadata test");
 		print_test(&promotion_test, "Promotion Test");
 		print_test(&test_ndarray_copy, "test ndarray copy");
