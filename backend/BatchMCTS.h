@@ -99,6 +99,8 @@ public:
 		}
 	}
 
+	inline int current_sector() { return cur_sector; }
+
 	BatchMCTS(
 		int num_sims_per_move,
 		float temperature,
