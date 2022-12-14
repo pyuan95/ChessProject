@@ -419,9 +419,23 @@ public:
 	// selects the best move by count with the given temperature
 	inline Move get_best_move(float temperature) { return root->select_best_child_by_count(temperature).second; }
 
+	// same as play_best_move() except the game tree is reset
+	inline void play_best_move_and_reset()
+	{
+		play_best_move();
+		MCTSNode *newroot = new MCTSNode(root->get_color());
+		if (root != nullptr)
+			delete root;
+		root = newroot;
+		best_leaf = nullptr;
+		best_leaf_path.clear();
+		best_leaf_path.reserve(200);
+	}
+
 	// samples a move from the policy according to the temperature and plays it.
 	// if we are at a terminal position, we do nothing
 	// if the best move leads to a terminal position and autoplay is on, the game is restarted
+	// cannot be called between select() and update()
 	void play_best_move();
 
 	// returns the number of nodes in this tree.

@@ -72,11 +72,15 @@ public:
 	// samples a move from the policy according to the temperature and plays it.
 	// if we are at a terminal position, we do nothing
 	// if the best move leads to a terminal position and autoplay is on, the game is restarted
-	inline void play_best_moves()
+	// if [reset] then resets the game tree as well
+	inline void play_best_moves(bool reset)
 	{
 		for (MCTS &m : arr)
 		{
-			m.play_best_move();
+			if (reset)
+				m.play_best_move_and_reset();
+			else
+				m.play_best_move();
 		}
 	}
 

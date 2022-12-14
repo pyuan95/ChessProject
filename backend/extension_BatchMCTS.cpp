@@ -87,9 +87,9 @@ extern "C"
             m->set_temperature(temp);
         }
 
-        void play_best_moves(BatchMCTS *m)
+        void play_best_moves(BatchMCTS *m, bool reset)
         {
-            m->play_best_moves();
+            m->play_best_moves(reset);
         }
 
         bool all_games_over(BatchMCTS *m)

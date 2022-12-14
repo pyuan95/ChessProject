@@ -24,7 +24,7 @@ BatchMCTSExtension.createBatchMCTS.argtypes = [
 BatchMCTSExtension.select.argtypes = [POINTER(c_char)]
 BatchMCTSExtension.update.argtypes = [POINTER(c_char), Structure, Structure]
 BatchMCTSExtension.set_temperature.argtypes = [POINTER(c_char), c_float]
-BatchMCTSExtension.play_best_moves.argtypes = [POINTER(c_char)]
+BatchMCTSExtension.play_best_moves.argtypes = [POINTER(c_char), c_bool]
 BatchMCTSExtension.all_games_over.argtypes = [POINTER(c_char)]
 BatchMCTSExtension.proportion_of_games_over.argtypes = [POINTER(c_char)]
 BatchMCTSExtension.results.argtypes = [POINTER(c_char), Structure]
@@ -90,8 +90,8 @@ class BatchMCTS:
     def set_temperature(self, temp: float) -> None:
         BatchMCTSExtension.set_temperature(self.ptr, c_float(temp))
 
-    def play_best_moves(self) -> None:
-        BatchMCTSExtension.play_best_moves(self.ptr)
+    def play_best_moves(self, reset: bool) -> None:
+        BatchMCTSExtension.play_best_moves(self.ptr, reset)
 
     def all_games_over(self) -> bool:
         return BatchMCTSExtension.all_games_over(self.ptr)
