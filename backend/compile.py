@@ -26,6 +26,6 @@ files = [
 ]
 files = [f.replace(".cpp", "") for f in files]
 for f in files:
-    s("g++ -std=c++17 {0} -fPIC -c {1} -o ./output/{2}".format(opt, f + ".cpp", f + ".o"))
+    s("g++ -std=c++17 {0} -fPIC -c {1} -o ./output/{2} -pthread".format(opt, f + ".cpp", f + ".o"))
 files = ["./output/" + f + ".o" for f in files]
 s("g++ -shared -o ./output/extension_BatchMCTS.so {0}".format(" ".join(files)))

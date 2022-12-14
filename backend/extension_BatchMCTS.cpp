@@ -6,11 +6,11 @@ extern "C"
 {
     namespace
     {
-        int myfunc(numpyArray<double> array1, numpyArray<double> array2, char *test, int x)
+        int myfunc(numpyArray<float> array1, numpyArray<float> array2, char *test, int x)
         {
-            Ndarray<double, 3> a(array1);
-            Ndarray<double, 3> b(array2);
-
+            Ndarray<float, 3> a(array1);
+            Ndarray<float, 3> b(array2);
+            std::cout << "inside my func: " << a << "\n\n\n\n";
             double sum = 0.0;
 
             for (int i = 0; i < a.getShape(0); i++)
@@ -24,6 +24,7 @@ extern "C"
                     }
                 }
             }
+            std::cout << "after my func: " << a << "\n\n\n\n";
             std::cout << "test! " << test << "\n";
             std::cout << "x! " << x << "\n";
             return sum;

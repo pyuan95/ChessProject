@@ -772,7 +772,7 @@ void test_select_best_move_correctly()
 
 void batch_mcts_test()
 {
-	int iterations = 1000000;
+	int iterations = 10000;
 	int num_sims_per_move = 500;
 	float temperature = 1.0;
 	bool autoplay = true;
@@ -884,11 +884,6 @@ void test_ndarray_copy()
 		new long[4]{batch_size, ROWS, COLS, MOVES_PER_SQUARE},
 		new long[4]{ROWS * COLS * MOVES_PER_SQUARE, COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
 
-	Ndarray<float, 4> policy2(
-		new float[batch_size * ROWS * COLS * MOVES_PER_SQUARE](),
-		new long[4]{batch_size, ROWS, COLS, MOVES_PER_SQUARE},
-		new long[4]{ROWS * COLS * MOVES_PER_SQUARE, COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
-
 	for (int a = 0; a < batch_size; a++)
 	{
 		for (int i = 0; i < ROWS; i++)
@@ -903,7 +898,7 @@ void test_ndarray_copy()
 		}
 	}
 
-	policy2.copy(policy);
+	Ndarray<float, 4> policy2 = policy.deepcopy();
 
 	for (int a = 0; a < batch_size; a++)
 	{
@@ -970,9 +965,10 @@ void tablebase_test()
 
 void run_all_tests()
 {
-	// print_test(&batch_mcts_test, "batch mcts");
-	if (true)
+	print_test(&test_ndarray_copy, "test ndarray copy");
+	if (false)
 	{
+		print_test(&batch_mcts_test, "batch mcts");
 		print_test(&tablebase_test, "Tablebase Test");
 		print_test(&policy_completeness_test, "Policy Completeness Test");
 		print_test(&test_metadata, "metadata test");

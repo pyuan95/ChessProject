@@ -1,15 +1,110 @@
 import numpy as np
 from constants import *
 import os
-from collections import defaultdict
+from collections import defaultdict, deque
 from numpyctypes import c_ndarray
 from numpy.ctypeslib import load_library
 from ctypes import *
 
 BatchMCTSExtension = load_library("extension_BatchMCTS", "../backend/output")
-BatchMCTSExtension.proportion_of_games_over.restype = c_float
+BatchMCTSExtension.initialize.argtypes = [POINTER(c_char)]
+BatchMCTSExtension.deleteBatchMCTS.argtypes = [POINTER(c_char)]
+BatchMCTSExtension.createBatchMCTS.argtypes = [
+    c_int,
+    c_float,
+    c_bool,
+    POINTER(c_char),
+    c_int,
+    c_int,
+    c_int,
+    c_float,
+    Structure,
+    Structure,
+]
+BatchMCTSExtension.select.argtypes = [POINTER(c_char)]
+BatchMCTSExtension.update.argtypes = [POINTER(c_char), Structure, Structure]
+BatchMCTSExtension.set_temperature.argtypes = [POINTER(c_char), c_float]
+BatchMCTSExtension.play_best_moves.argtypes = [POINTER(c_char)]
+BatchMCTSExtension.all_games_over.argtypes = [POINTER(c_char)]
+BatchMCTSExtension.proportion_of_games_over.argtypes = [POINTER(c_char)]
+BatchMCTSExtension.results.argtypes = [POINTER(c_char), Structure]
+BatchMCTSExtension.current_sector.argtypes = [POINTER(c_char)]
+
+BatchMCTSExtension.createBatchMCTS.restype = POINTER(c_char)
 BatchMCTSExtension.all_games_over.restype = c_bool
+BatchMCTSExtension.proportion_of_games_over.restype = c_double
 BatchMCTSExtension.current_sector.restype = c_int
+
+
+class BatchMCTS:
+    def __init__(
+        self,
+        num_sims_per_move: int,
+        temperature: float,
+        autoplay: bool,
+        output: str,
+        num_threads: int,
+        batch_size: int,
+        num_sectors: int,
+        cpuct: float,
+        boards_: np.ndarray,
+        metadata_: np.ndarray,
+        tablebase_path: str,
+    ) -> None:
+        boards = c_ndarray(boards_)
+        metadata = c_ndarray(metadata_)
+        # make caches to keep arrays in memory as required by BatchMCTS
+        self.select_cache = [boards, metadata, boards_, metadata_]
+        self.update_cache = deque()
+        self.num_sectors = num_sectors
+        output = c_char_p(bytes(output, encoding="utf8"))
+        tablebase_path = c_char_p(bytes(tablebase_path, encoding="utf8"))
+        BatchMCTSExtension.initialize(tablebase_path)
+        self.ptr = BatchMCTSExtension.createBatchMCTS(
+            num_sims_per_move,
+            c_float(temperature),
+            autoplay,
+            output,
+            num_threads,
+            batch_size,
+            num_sectors,
+            c_float(cpuct),
+            boards,
+            metadata,
+        )
+
+    def cleanup(self) -> None:
+        BatchMCTSExtension.deleteBatchMCTS(self.ptr)
+
+    def select(self) -> None:
+        BatchMCTSExtension.select(self.ptr)
+
+    def update(self, q_: np.ndarray, policy_: np.ndarray) -> None:
+        q = c_ndarray(q_)
+        policy = c_ndarray(policy_)
+        self.update_cache.append((q, policy, q_, policy_))
+        if len(self.update_cache) > self.num_sectors * 4:
+            self.update_cache.popleft()
+        BatchMCTSExtension.update(self.ptr, q, policy)
+
+    def set_temperature(self, temp: float) -> None:
+        BatchMCTSExtension.set_temperature(self.ptr, c_float(temp))
+
+    def play_best_moves(self) -> None:
+        BatchMCTSExtension.play_best_moves(self.ptr)
+
+    def all_games_over(self) -> bool:
+        return BatchMCTSExtension.all_games_over(self.ptr)
+
+    def proportion_of_games_over(self) -> float:
+        return BatchMCTSExtension.proportion_of_games_over(self.ptr)
+
+    def results(self, res: np.ndarray) -> None:
+        res = c_ndarray(res)
+        BatchMCTSExtension.results(self.ptr, res)
+
+    def current_sector(self) -> int:
+        return BatchMCTSExtension.current_sector(self.ptr)
 
 
 def generate_examples(lines):
@@ -32,8 +127,9 @@ def generate_examples(lines):
             p = float(moves[j + 3])
             policy[r, c, i] = p
             legal_moves[r, c, i] = 1
+        assert abs(1 - np.sum(policy)) < 0.001
         yield {
-            "board": board,
+            "board": board.reshape(ROWS, COLS),
             "metadata": metadata,
             "policy": policy,
             "value": value if color == "WHITE" else value * -1,
@@ -80,7 +176,13 @@ def generate_batches_from_directory(dir, batch_size):
         policy = np.concatenate([x["policy"][None, ...] for x in res], axis=0)
         legal_moves = np.concatenate([x["legal moves"][None, ...] for x in res], axis=0)
         value = np.array([x["value"] for x in res])
-        return {"board": board, "metadata": metadata, "policy": policy, "value": value, "legal moves": legal_moves}
+        return {
+            "board": board,
+            "metadata": metadata,
+            "policy": policy,
+            "value": value,
+            "legal moves": legal_moves,
+        }
 
     for example in generate_examples_from_directory(dir):
         res.append(example)
@@ -90,67 +192,3 @@ def generate_batches_from_directory(dir, batch_size):
 
     if len(res) > 0:
         yield result()
-
-
-class BatchMCTS:
-    def __init__(
-        self,
-        num_sims_per_move: int,
-        temperature: float,
-        autoplay: bool,
-        output: str,
-        num_threads: int,
-        batch_size: int,
-        num_sectors: int,
-        cpuct: float,
-        boards: np.ndarray,
-        metadata: np.ndarray,
-        tablebase_path: str,
-    ) -> None:
-        boards = c_ndarray(boards, dtype=int, ndim=len(boards.shape), shape=boards.shape)
-        metadata = c_ndarray(metadata, dtype=int, ndim=len(metadata.shape), shape=metadata.shape)
-        output = c_char_p(bytes(output, encoding="utf8"))
-        tablebase_path = c_char_p(bytes(tablebase_path, encoding="utf8"))
-        BatchMCTSExtension.intiialize(tablebase_path)
-        self.ptr = BatchMCTSExtension.createBatchMCTS(
-            num_sims_per_move,
-            c_float(temperature),
-            autoplay,
-            output,
-            num_threads,
-            batch_size,
-            num_sectors,
-            c_float(cpuct),
-            boards,
-            metadata,
-        )
-
-    def cleanup(self) -> None:
-        BatchMCTSExtension.deleteBatchMCTS(self.ptr)
-
-    def select(self) -> None:
-        BatchMCTSExtension.select(self.ptr)
-
-    def update(self, q: np.ndarray, policy: np.ndarray) -> None:
-        q = c_ndarray(q, dtype=np.float, ndim=len(q.shape), shape=q.shape)
-        policy = c_ndarray(policy, dtype=np.float, ndim=len(policy.shape), shape=policy.shape)
-        BatchMCTSExtension.update(self.ptr, q, policy)
-
-    def set_temperature(self, temp: float) -> None:
-        BatchMCTSExtension.set_temperature(self.ptr, c_float(temp))
-
-    def play_best_moves(self) -> None:
-        BatchMCTSExtension.play_best_moves(self.ptr)
-
-    def all_games_over(self) -> bool:
-        return BatchMCTSExtension.all_games_over(self.ptr)
-
-    def proportion_of_games_over(self) -> float:
-        return BatchMCTSExtension.proportion_of_games_over(self.ptr)
-
-    def results(self, res: np.ndarray) -> None:
-        res = c_ndarray(res, dtype=int, ndim=len(res.shape), shape=res.shape)
-        BatchMCTSExtension.results(self.ptr, res)
-
-    def current_sector(self) -> int:
-        return BatchMCTSExtension.current_sector(self.ptr)

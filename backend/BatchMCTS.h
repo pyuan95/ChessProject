@@ -9,7 +9,8 @@
 #include <time.h>
 #include "MCTS.h"
 
-struct Sector {
+struct Sector
+{
 	Ndarray<float, 1> q;
 	Ndarray<float, 4> policy;
 	int sector;
@@ -17,7 +18,8 @@ struct Sector {
 	Sector(int sector, Ndarray<float, 1> q, Ndarray<float, 4> policy) : sector(sector), q(q), policy(policy) {}
 };
 
-class BatchMCTS {
+class BatchMCTS
+{
 private:
 	float cpuct;
 
@@ -25,15 +27,15 @@ private:
 	int num_threads;
 	int batch_size;
 	int num_sectors;
-	Ndarray<int, 3> boards; // (batch_size * num_sectors, 8, 8)
+	Ndarray<int, 3> boards;	  // (batch_size * num_sectors, 8, 8)
 	Ndarray<int, 2> metadata; // (batch_size * num_sectors, 5)
 
 	int cur_sector;
 	std::vector<Sector> working_sectors;
-	std::mutex queue_consumer_mutex; // mutex for queue_consumer
-	std::mutex update_mutex; // mutex for update method
-	std::mutex select_mutex; // mutex for select method
-	std::condition_variable queue_add; // notify_all called when something is added to queue
+	std::mutex queue_consumer_mutex;	  // mutex for queue_consumer
+	std::mutex update_mutex;			  // mutex for update method
+	std::mutex select_mutex;			  // mutex for select method
+	std::condition_variable queue_add;	  // notify_all called when something is added to queue
 	std::condition_variable queue_remove; // notify_all called when something is removed from queue
 
 	std::thread queue_consumer_thread;
@@ -41,11 +43,11 @@ private:
 
 	void update_sector(int sector, Ndarray<float, 1> q, Ndarray<float, 4> policy);
 
-	void process_thread(Ndarray<float, 1> q, Ndarray<float, 4> policy, int& next, const int target, std::mutex& m);
+	void process_thread(Ndarray<float, 1> q, Ndarray<float, 4> policy, int &next, const int target, std::mutex &m);
 
 	void queue_consumer();
 
-	Sector& get_next_sector();
+	Sector &get_next_sector();
 
 	int num_working_sectors();
 
@@ -58,8 +60,10 @@ public:
 	void update(Ndarray<float, 1> q, Ndarray<float, 4> policy); // (batch_size), (batch_size, rows, cols, moves_per_square)
 
 	// sets the temperature for each game
-	inline void set_temperature(float const temp) {
-		for (MCTS& m : arr) {
+	inline void set_temperature(float const temp)
+	{
+		for (MCTS &m : arr)
+		{
 			m.temperature = temp;
 		}
 	}
@@ -68,81 +72,90 @@ public:
 	// samples a move from the policy according to the temperature and plays it.
 	// if we are at a terminal position, we do nothing
 	// if the best move leads to a terminal position and autoplay is on, the game is restarted
-	inline void play_best_moves() {
-		for (MCTS& m : arr) {
+	inline void play_best_moves()
+	{
+		for (MCTS &m : arr)
+		{
 			m.play_best_move();
 		}
 	}
 
-	inline bool all_games_over() {
-		for (MCTS& m : arr) {
+	inline bool all_games_over()
+	{
+		for (MCTS &m : arr)
+		{
 			if (!m.isover())
 				return false;
 		}
 		return true;
 	}
 
-	inline double proportion_of_games_over() {
+	inline double proportion_of_games_over()
+	{
 		size_t cnt = 0;
-		for (MCTS& m : arr) {
-			cnt += (int) m.isover();
+		for (MCTS &m : arr)
+		{
+			cnt += (int)m.isover();
 		}
-		return cnt / ((double) arr.size());
+		return cnt / ((double)arr.size());
 	}
 
 	// writes the results of the games to the given array
-	inline void results(Ndarray<int, 1> res) {
+	inline void results(Ndarray<int, 1> res)
+	{
 		size_t x = 0;
-		for (MCTS& m : arr) {
+		for (MCTS &m : arr)
+		{
 			res[x] = m.terminal_evaluation();
 			x++;
 		}
 	}
 
-	inline int current_sector() { return cur_sector; }
+	inline int current_sector()
+	{
+		return cur_sector;
+	}
 
 	BatchMCTS(
 		int num_sims_per_move,
 		float temperature,
-		bool autoplay, 
+		bool autoplay,
 		string output, // the base name of the output file.
 		int num_threads,
 		int batch_size,
 		int num_sectors,
 		float cpuct,
 		Ndarray<int, 3> boards,
-		Ndarray<int, 2> metadata
-	)
+		Ndarray<int, 2> metadata)
 		: num_threads(num_threads),
-		batch_size(batch_size),
-		num_sectors(num_sectors),
-		cpuct(cpuct),
-		boards(boards),
-		metadata(metadata),
-		working_sectors(
-			num_sectors,
-			Sector(
-				-1,
-				Ndarray<float, 1>(nullptr, nullptr, nullptr),
-				Ndarray<float, 4>(nullptr, nullptr, nullptr)
-			)
-		),
-		cur_sector(0)
+		  batch_size(batch_size),
+		  num_sectors(num_sectors),
+		  cpuct(cpuct),
+		  boards(boards),
+		  metadata(metadata),
+		  working_sectors(
+			  num_sectors,
+			  Sector(
+				  -1,
+				  Ndarray<float, 1>(nullptr, nullptr, nullptr),
+				  Ndarray<float, 4>(nullptr, nullptr, nullptr))),
+		  cur_sector(0)
 	{
-		if (boards.getShape(0) != batch_size * num_sectors
-			|| boards.getShape(1) != ROWS
-			|| boards.getShape(2) != COLS) {
+		if (boards.getShape(0) != batch_size * num_sectors || boards.getShape(1) != ROWS || boards.getShape(2) != COLS)
+		{
 			throw std::runtime_error("boards must have shape (batch_size * num_sectors, 8, 8)");
 		}
-		else if (metadata.getShape(0) != batch_size * num_sectors
-			|| metadata.getShape(1) != METADATA_LENGTH) {
+		else if (metadata.getShape(0) != batch_size * num_sectors || metadata.getShape(1) != METADATA_LENGTH)
+		{
 			throw std::runtime_error("metadata must have shape (batch_size * num_sectors, 5)");
 		}
 		this->arr.reserve(batch_size * num_sectors);
-		for (int i = 0; i < batch_size * num_sectors; i++) {
+		for (int i = 0; i < batch_size * num_sectors; i++)
+		{
 			string new_output = "";
-			if (!output.empty()) {
-				long current_time = (long) std::chrono::system_clock::now().time_since_epoch().count();
+			if (!output.empty())
+			{
+				long current_time = (long)std::chrono::system_clock::now().time_since_epoch().count();
 				new_output = output + "_" + std::to_string(i) + "_" + std::to_string(current_time);
 			}
 			this->arr.emplace_back(num_sims_per_move, temperature, autoplay, new_output);
@@ -151,7 +164,8 @@ public:
 		queue_consumer_thread = std::thread(&BatchMCTS::queue_consumer, this);
 	}
 
-	~BatchMCTS() {
+	~BatchMCTS()
+	{
 		alive = false;
 		queue_add.notify_all();
 		queue_consumer_thread.join();
