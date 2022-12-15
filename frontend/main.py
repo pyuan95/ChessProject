@@ -2,7 +2,6 @@ import numpy as np
 from utils import *
 from model import ChessModel
 import tensorflow as tf
-from collections import deque
 from constants import *
 
 # BatchMCTS settings
@@ -11,7 +10,7 @@ temperature: float = 1.0
 autoplay: bool = True
 output_directory = "./games"
 output: str = output_directory + "/game"
-# output = ""  # for now...
+output = ""  # for now...
 num_threads: int = 1
 batch_size: int = 4
 num_sectors: int = 1
@@ -21,6 +20,19 @@ boards_reshaped: np.ndarray = boards.reshape([num_sectors * batch_size, ROWS, CO
 metadata: np.ndarray = np.zeros([num_sectors, batch_size, METADATA_LENGTH], dtype=np.int32)
 metadata_reshaped: np.ndarray = metadata.reshape([num_sectors * batch_size, METADATA_LENGTH])
 tablebase_path: str = "../backend/tablebase"
+
+# play options
+play_options = {
+    "num_sims_per_move": 25,
+    "temperature": 1.0,
+    "autoplay": False,
+    "output": "",
+    "num_threads": 1,
+    "batch_size": 4,
+    "num_sectors": 1,
+    "cpuct": 0.05,
+    "tablebase_path": "../backend/tablebase",
+}
 
 # model settings
 num_layers = 4
@@ -73,7 +85,7 @@ def inference(loop_num):
         b = boards[cur_sector]
         m = metadata[cur_sector]
         out_policy, out_q = model.call(b, m)
-        batch_mcts.update(out_q.numpy().flatten(), out_policy.numpy())
+        batch_mcts.update(out_q.numpy().flatten().astype(np.float32), out_policy.numpy().astype(np.float32))
         if i > 0 and i % (100 * num_sims_per_move) == 0:
             pnl(
                 "finished inference move {0}/{1} in loop {2}!".format(
@@ -112,13 +124,16 @@ def train(loopidx):
     pnl("finished train loop {0}! loss was {1}".format(loopidx, train_loss.result().numpy()))
 
 
-index = 0
-while True:
-    inference(index)
-    train(index)
-    manager.save()
-    index += 1
+# index = 0
+# while True:
+#     inference(index)
+#     train(index)
+#     manager.save()
+#     index += 1
 
-
-# inference
-# batch_mcts.select()
+model2 = ChessModel(num_layers, depth, d_fnn)
+play(
+    model,
+    model2,
+    play_options,
+)

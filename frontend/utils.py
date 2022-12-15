@@ -91,7 +91,7 @@ class BatchMCTS:
         BatchMCTSExtension.set_temperature(self.ptr, c_float(temp))
 
     def play_best_moves(self, reset: bool) -> None:
-        BatchMCTSExtension.play_best_moves(self.ptr, reset)
+        BatchMCTSExtension.play_best_moves(self.ptr, c_bool(reset))
 
     def all_games_over(self) -> bool:
         return BatchMCTSExtension.all_games_over(self.ptr)
@@ -192,3 +192,52 @@ def generate_batches_from_directory(dir, batch_size):
 
     if len(res) > 0:
         yield result()
+
+
+# plays 2 * num_games games given both models
+# requires: batchmcts has auto-play off, num_sectors = 1
+# batchmctsoptions: all args except for boards, metadata
+def play(model1, model2, batchmctsoptions: dict):
+    assert not batchmctsoptions["autoplay"]
+    assert batchmctsoptions["num_sectors"] == 1
+    batch_size = batchmctsoptions["batch_size"]
+    assert batch_size % 2 == 0
+    split = batch_size // 2
+    num_sims_per_move = batchmctsoptions["num_sims_per_move"]
+    boards: np.ndarray = np.zeros([batch_size, ROWS, COLS], dtype=np.int32)
+    metadata: np.ndarray = np.zeros([batch_size, METADATA_LENGTH], dtype=np.int32)
+
+    batchmctsoptions["boards_"] = boards
+    batchmctsoptions["metadata_"] = metadata
+    batchmcts = BatchMCTS(**batchmctsoptions)
+
+    movenum = 1
+    while not batchmcts.all_games_over():
+        iswhite = movenum % 2
+        for _ in range(num_sims_per_move):
+            batchmcts.select()
+            b1 = boards[:split]
+            m1 = metadata[:split]
+            b2 = boards[split:]
+            m2 = metadata[split:]
+            out_policy1, out_q1 = model1.call(b1, m1) if iswhite else model2.call(b1, m1)
+            out_policy2, out_q2 = model2.call(b2, m2) if iswhite else model1.call(b2, m2)
+            out_policy = np.concatenate([out_policy1.numpy(), out_policy2.numpy()], axis=0).astype(np.float32)
+            out_q = np.concatenate([out_q1.numpy(), out_q2.numpy()], axis=0).flatten().astype(np.float32)
+            batchmcts.update(out_q, out_policy)
+        batchmcts.play_best_moves(reset=False)
+        print("finished playing move number {0}".format(movenum))
+        print("proportion of games over: {0}".format(batchmcts.proportion_of_games_over()))
+        movenum += 1
+    results = np.zeros([batch_size], dtype=np.int32)
+    batchmcts.results(results)
+    results[split:] *= -1  # since model1 plays as black on results[split:]
+    unique, counts = np.unique(results, return_counts=True)
+    scores = dict(zip(unique, counts))
+    if -1 not in scores:
+        scores[-1] = 0
+    if 1 not in scores:
+        scores[1] = 0
+    if 0 not in scores:
+        scores[0] = 0
+    return scores
