@@ -32,6 +32,7 @@ private:
 
 	int cur_sector;
 	std::vector<Sector> working_sectors;
+	std::mutex no_workers_mutex;		  // mutex for wait_until_no_workers
 	std::mutex queue_consumer_mutex;	  // mutex for queue_consumer
 	std::mutex update_mutex;			  // mutex for update method
 	std::mutex select_mutex;			  // mutex for select method
@@ -51,6 +52,8 @@ private:
 
 	int num_working_sectors();
 
+	void wait_until_no_workers();
+
 public:
 	// calling this function ensures that the Ndarray corresponding to the current sector has finished being selected and updated
 	void select();
@@ -62,30 +65,18 @@ public:
 	// sets the temperature for each game
 	inline void set_temperature(float const temp)
 	{
+		wait_until_no_workers();
 		for (MCTS &m : arr)
 		{
 			m.temperature = temp;
 		}
 	}
 
-	// for each game...
-	// samples a move from the policy according to the temperature and plays it.
-	// if we are at a terminal position, we do nothing
-	// if the best move leads to a terminal position and autoplay is on, the game is restarted
-	// if [reset] then resets the game tree as well
-	inline void play_best_moves(bool reset)
-	{
-		for (MCTS &m : arr)
-		{
-			if (reset)
-				m.play_best_move_and_reset();
-			else
-				m.play_best_move();
-		}
-	}
+	void play_best_moves(bool reset);
 
 	inline bool all_games_over()
 	{
+		wait_until_no_workers();
 		for (MCTS &m : arr)
 		{
 			if (!m.isover())
@@ -96,6 +87,7 @@ public:
 
 	inline double proportion_of_games_over()
 	{
+		wait_until_no_workers();
 		size_t cnt = 0;
 		for (MCTS &m : arr)
 		{
@@ -107,6 +99,7 @@ public:
 	// writes the results of the games to the given array
 	inline void results(Ndarray<int, 1> res)
 	{
+		wait_until_no_workers();
 		size_t x = 0;
 		for (MCTS &m : arr)
 		{

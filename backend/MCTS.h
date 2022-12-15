@@ -329,6 +329,7 @@ private:
 	ofstream output;
 	int move_num;
 	int game_num;
+	int tablebase_eval; // >= 2 means no eval; -1, 0, 1 mean it's been set
 
 	// adds a move to the current game
 	// we want to pass by value bc board_state, p, m, c, are made on stack.
@@ -379,9 +380,9 @@ public:
 		game_num = 1;
 	}
 
-	// returns whether the game is over (root is terminal)
+	// returns whether the game is over (root is terminal or tablebase result)
 	// this is only possible when autoplay is disabled
-	inline bool isover() { return root->is_terminal_position(); }
+	inline bool isover() { return root->is_terminal_position() || tablebase_eval < 2; }
 
 	// returns 1 if white has won, -1 if black has won, and 0 otherwise
 	inline int terminal_evaluation()
@@ -417,6 +418,7 @@ public:
 	inline float minimax_evaluation() { return root->minimax_evaluation(); }
 
 	// selects the best move by count with the given temperature
+	// REQUIRES: root is not terminal and has been expanded at least once!
 	inline Move get_best_move(float temperature) { return root->select_best_child_by_count(temperature).second; }
 
 	// same as play_best_move() except the game tree is reset
@@ -424,13 +426,20 @@ public:
 	{
 		play_best_move();
 		MCTSNode *newroot = new MCTSNode(root->get_color());
+		bool itp = root->is_terminal_position();
 		if (root != nullptr)
 			delete root;
 		root = newroot;
+		if (itp)
+			root->mark_terminal_position();
 		best_leaf = nullptr;
 		best_leaf_path.clear();
 		best_leaf_path.reserve(200);
 	}
+
+	// make it seem like an undo-select call never happened
+	// requires that you re-select afterwards...
+	void undo_select();
 
 	// samples a move from the policy according to the temperature and plays it.
 	// if we are at a terminal position, we do nothing
@@ -463,7 +472,7 @@ public:
 	MCTS(const int num_sims_per_move, float t = 1.0, bool auto_play = true, string output = "") : root(new MCTSNode(WHITE)), best_leaf(nullptr), best_leaf_path(), p(),
 																								  sim_limit(num_sims_per_move), temperature(t), default_temp(t),
 																								  auto_play(auto_play), moves(new Move[MAX_MOVES]), nmoves(0), leaves(MAX_MOVES, pair<Move, float>(0, 0.0f)),
-																								  move_num(1), game_num(1), output_path_base(output)
+																								  move_num(1), game_num(1), output_path_base(output), tablebase_eval(2)
 	{
 		update_output();
 		best_leaf_path.reserve(200);
@@ -497,7 +506,8 @@ public:
 			   output(std::move(other.output)),
 			   move_num(other.move_num),
 			   game_num(other.game_num),
-			   temperature(other.temperature)
+			   temperature(other.temperature),
+			   tablebase_eval(other.tablebase_eval)
 	{
 		other.root = nullptr;
 		other.moves = nullptr;

@@ -141,7 +141,7 @@ std::pair<MCTSNode *, Move> MCTSNode::select_best_child_by_count(float temperatu
 		return std::pair<MCTSNode *, Move>(nullptr, 0);
 	}
 	float *cum_sum = calculate_policy_cumsum(temperature);
-	float thresh = rand_num(0, cum_sum[num_expanded - 1] + EPSILON);
+	float thresh = rand_num(0, cum_sum[num_expanded - 1] + EPSILON) - EPSILON;
 	for (int i = 0; i < num_expanded; i++)
 	{
 		if (cum_sum[i] >= thresh)
@@ -262,6 +262,7 @@ void MCTS::new_game()
 	temperature = default_temp;
 	game_num++;
 	move_num = 1;
+	tablebase_eval = 2;
 	update_output();
 }
 
@@ -330,7 +331,6 @@ bool MCTS::select_helper(const float cpuct, Ndarray<int, 2> &board, Ndarray<int,
 		if (itp)
 			best_leaf->mark_terminal_position();
 	}
-
 	if (best_leaf->get_color() == WHITE)
 	{
 		writePosition<WHITE>(p, board, metadata);
@@ -342,10 +342,32 @@ bool MCTS::select_helper(const float cpuct, Ndarray<int, 2> &board, Ndarray<int,
 	return best_leaf->is_terminal_position();
 }
 
+// resets the invariants after a call to select()
+// to make it seem like it never happened!
+void MCTS::undo_select()
+{
+	best_leaf = nullptr;
+	Move m;
+	MCTSNode *cur;
+	while (!best_leaf_path.empty())
+	{
+		cur = best_leaf_path.back().first;
+		m = best_leaf_path.back().second;
+		best_leaf_path.pop_back();
+		if (cur != root)
+		{
+			if (cur->get_color() == WHITE)
+				p.undo<BLACK>(m);
+			else
+				p.undo<WHITE>(m);
+		}
+	}
+}
+
 void MCTS::play_best_move()
 {
 	// first, calculate the policy.
-	if (root->is_terminal_position())
+	if (root->is_terminal_position() || tablebase_eval < 2)
 	{
 		// only can happen when autoplay disabled
 		return;
@@ -363,7 +385,6 @@ void MCTS::play_best_move()
 			move2index(p, move, BLACK, pidx);
 		policy.p[pidx.r][pidx.c][pidx.i] = prob;
 	}
-
 	// write the legal moves;
 	LegalMoves legal_moves;
 	if (root->get_color() == WHITE)
@@ -399,22 +420,23 @@ void MCTS::play_best_move()
 		temperature = 0.25;
 	}
 
-	// check to see if the game is over. if so, declare a winner and start a new game.
-	if (auto_play)
+	// check tablebase for terminal position
+	int val;
+	if (probe(&val, p.fen()))
 	{
-		// first we check the tablebase
-		int val;
-		if (probe(&val, p.fen()))
-		{
-			declare_winner((float)val);
-			new_game();
-		}
-		// if it's not in the tablebase, check the root
-		else if (root->is_terminal_position())
-		{
-			declare_winner(evaluateTerminalPosition(p));
-			new_game();
-		}
+		tablebase_eval = val;
+	}
+
+	// check to see if the game is over. if so, declare a winner and start a new game.
+	if (auto_play && tablebase_eval < 2)
+	{
+		declare_winner(tablebase_eval);
+		new_game();
+	}
+	else if (auto_play && root->is_terminal_position())
+	{
+		declare_winner(evaluateTerminalPosition(p));
+		new_game();
 	}
 }
 
@@ -430,25 +452,10 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 	}
 
 	// if auto-play is disabled and we reach the sim limit,
-	// then simply unwind the invariants and return
+	// then simply undo select() and return
 	if (root->get_num_times_selected() >= sim_limit && !auto_play)
 	{
-		best_leaf = nullptr;
-		Move m;
-		MCTSNode *cur;
-		while (!best_leaf_path.empty())
-		{
-			cur = best_leaf_path.back().first;
-			m = best_leaf_path.back().second;
-			best_leaf_path.pop_back();
-			if (cur != root)
-			{
-				if (cur->get_color() == WHITE)
-					p.undo<BLACK>(m);
-				else
-					p.undo<WHITE>(m);
-			}
-		}
+		undo_select();
 		return;
 	}
 

@@ -919,7 +919,7 @@ void tablebase_test()
 {
 	int SIMS = 5;
 	float CPUCT = 0.01f;
-	MCTS *m = new MCTS(SIMS, CPUCT, true);
+	MCTS *m = new MCTS(SIMS, 1.0, true);
 	Position position;
 	Position::set("5k2/8/8/8/8/8/3KR3/8 w - - 0 1", position);
 	m->set_position(position);
@@ -963,12 +963,132 @@ void tablebase_test()
 	assert(m->game_number() == 2);
 }
 
+void not_autoplay_test()
+{
+	int SIMS = 10;
+	float temp = 0.1f;
+	float CPUCT = 0.05f;
+	MCTS *m = new MCTS(SIMS, temp, false);
+	Ndarray<float, 3>
+	dummy_policy(
+		new float[ROWS * COLS * MOVES_PER_SQUARE],
+		new long[3]{ROWS, COLS, MOVES_PER_SQUARE},
+		new long[3]{COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
+	Ndarray<int, 2> board(
+		new int[ROWS * COLS],
+		new long[2]{ROWS, COLS},
+		new long[2]{COLS, 1});
+
+	Ndarray<int, 1> metadata(
+		new int[METADATA_LENGTH],
+		new long[1]{METADATA_LENGTH},
+		new long[1]{1});
+
+	for (int r = 0; r < ROWS; r++)
+	{
+		for (int c = 0; c < COLS; c++)
+		{
+			for (int i = 0; i < MOVES_PER_SQUARE; i++)
+				dummy_policy[r][c][i] = 0.10f;
+		}
+	}
+	assert(m->move_number() == 1);
+	for (int z = 0; z < 10; z++)
+	{
+		m->select(CPUCT, board, metadata);
+		m->update(0.00, dummy_policy);
+	}
+	assert(m->move_number() == 1); // should not have auto-played!
+	for (int z = 0; z < 1000; z++)
+	{
+		m->select(CPUCT, board, metadata);
+		m->update(0.00, dummy_policy);
+	}
+	assert(m->move_number() == 1); // still should not have auto-played!
+	m->play_best_move();
+	assert(m->move_number() == 2); // still should not have auto-played!
+	assert(m->current_sims() > 0); // did not reset, this should be nonzero
+	for (int z = 0; z < 100; z++)
+	{
+		m->select(CPUCT, board, metadata);
+		m->update(0.00, dummy_policy);
+	}
+	assert(m->move_number() == 2); // should not have auto-played!
+	m->play_best_move_and_reset();
+	assert(m->move_number() == 3);	// should not have auto-played!
+	assert(m->current_sims() == 0); // we reset, should be zero
+}
+
+void not_autoplay_test_batchmcts()
+{
+	int num_sims_per_move = 30;
+	float temperature = 1.0;
+	bool autoplay = false;
+	string output = "";
+
+	int num_threads = 1;
+	int batch_size = 4;
+	int num_sectors = 1;
+	float cpuct = 1.0;
+
+	Ndarray<int, 3> boards(
+		new int[batch_size * num_sectors * ROWS * COLS],
+		new long[3]{batch_size * num_sectors, ROWS, COLS},
+		new long[3]{ROWS * COLS, COLS, 1});
+
+	Ndarray<float, 4> policy(
+		new float[batch_size * ROWS * COLS * MOVES_PER_SQUARE](),
+		new long[4]{batch_size, ROWS, COLS, MOVES_PER_SQUARE},
+		new long[4]{ROWS * COLS * MOVES_PER_SQUARE, COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
+
+	Ndarray<float, 1> q(
+		new float[batch_size],
+		new long[1]{batch_size},
+		new long[1]{1});
+
+	Ndarray<int, 2> metadata(
+		new int[batch_size * num_sectors * METADATA_LENGTH],
+		new long[2]{batch_size * num_sectors, METADATA_LENGTH},
+		new long[2]{METADATA_LENGTH, 1});
+
+	for (int a = 0; a < batch_size; a++)
+	{
+		for (int i = 0; i < ROWS; i++)
+		{
+			for (int j = 0; j < COLS; j++)
+			{
+				for (int k = 0; k < MOVES_PER_SQUARE; k++)
+				{
+					policy[a][i][j][k] = 10.0f * std::rand() / RAND_MAX;
+				}
+			}
+		}
+	}
+
+	BatchMCTS m(
+		num_sims_per_move, temperature, autoplay, output, num_threads, batch_size, num_sectors, cpuct, boards, metadata);
+	int movenum = 0;
+	while (!m.all_games_over())
+	{
+		// std::cout << movenum << "\n";
+		// std::cout << m.proportion_of_games_over() << "\n";
+		for (int i = 0; i < num_sims_per_move; i++)
+		{
+			m.select();
+			m.update(q, policy);
+		}
+		m.play_best_moves(true);
+		movenum++;
+	}
+}
+
 void run_all_tests()
 {
-	print_test(&test_ndarray_copy, "test ndarray copy");
-	if (false)
+	print_test(&not_autoplay_test, "not autoplay test");
+	print_test(&not_autoplay_test_batchmcts, "not autoplay test batchmcts version");
+	if (true)
 	{
-		print_test(&batch_mcts_test, "batch mcts");
+		// print_test(&batch_mcts_test, "batch mcts");
 		print_test(&tablebase_test, "Tablebase Test");
 		print_test(&policy_completeness_test, "Policy Completeness Test");
 		print_test(&test_metadata, "metadata test");

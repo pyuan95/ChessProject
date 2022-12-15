@@ -11,6 +11,37 @@ Sector &BatchMCTS::get_next_sector()
 	throw std::runtime_error("should not happen!");
 }
 
+bool workers_are_alive(std::vector<Sector> &sectors)
+{
+	for (int i = 0; i < sectors.size(); i++)
+		if (sectors[i].sector >= 0)
+			return true;
+	return false;
+}
+
+void BatchMCTS::wait_until_no_workers()
+{
+	std::unique_lock<std::mutex> lock(no_workers_mutex);
+	// wait until no more workers
+	while (workers_are_alive(working_sectors))
+		queue_remove.wait(lock);
+}
+
+void BatchMCTS::play_best_moves(bool reset)
+{
+	wait_until_no_workers();
+	for (int i = 0; i < batch_size * num_sectors; i++)
+	{
+		MCTS &m = arr[i];
+		m.undo_select();
+		if (reset)
+			m.play_best_move_and_reset();
+		else
+			m.play_best_move();
+		m.select(cpuct, boards[i], metadata[i]);
+	}
+}
+
 int BatchMCTS::num_working_sectors()
 {
 	int count = 0;
