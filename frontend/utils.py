@@ -240,4 +240,5 @@ def play(model1, model2, batchmctsoptions: dict):
         scores[1] = 0
     if 0 not in scores:
         scores[0] = 0
+    scores["results"] = results
     return scores
