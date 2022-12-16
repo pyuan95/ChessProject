@@ -55,10 +55,9 @@ void move2index(const Position &p, Move m, Color color, PolicyIndex &policyIndex
 
 MCTSNode *MCTSNode::add_leaf()
 {
-	reallocate_memory();
-
-	get_node_at(num_expanded) = MCTSNode(~get_color());
 	num_expanded++;
+	reallocate_memory();
+	get_node_at(num_expanded - 1) = MCTSNode(~get_color());
 
 	return begin_nodes() + num_expanded - 1;
 }
@@ -79,12 +78,12 @@ void MCTSNode::select_best_child(const float cpuct, std::pair<MCTSNode *, Move> 
 	for (int i = 0; i < num_expanded; i++)
 	{
 		// mean q is evaluated for the other side; we want to minimize the other side's success.
-		MCTSNode &child = get_node_at(i);
-		u = start * get_prob_at(i) / (1.0f + child.get_num_times_selected()) - child.get_mean_q();
+		MCTSNode &a = get_node_at(i);
+		u = start * get_prob_at(i) / (1.0f + a.get_num_times_selected()) - a.get_mean_q();
 		if (u > best)
 		{
 			best = u;
-			res = &child;
+			res = &a;
 			best_move = get_move_at(i);
 		}
 		// std::cout << "Child count: " << child.get_num_times_selected() << "\tvalue: " << u - child.get_mean_q() << "\n";
@@ -252,8 +251,7 @@ void MCTS::declare_winner(float c)
 void MCTS::new_game()
 {
 	// delete and reset old resources
-	if (root != nullptr)
-		delete root;
+	delete_root();
 	root = new MCTSNode(WHITE);
 	best_leaf = nullptr;
 	best_leaf_path.clear();
@@ -408,9 +406,9 @@ void MCTS::play_best_move()
 	else
 		p.play<BLACK>(m);
 
-	MCTSNode *newRoot = new MCTSNode(*(best_child.first)); // shallow copy the best child
-	recursive_delete(*root, best_child.first);
-	root = newRoot;
+	MCTSNode *newroot = new MCTSNode(*(best_child.first)); // shallow copy the best child
+	recursive_delete(*root, best_child.first, true);
+	root = newroot;
 
 	// add the move to the game.
 	add_move(board_state, policy, legal_moves, m, root_color);
@@ -503,17 +501,19 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 		play_best_move();
 }
 
-void recursive_delete(MCTSNode &n, MCTSNode *ignore)
+void recursive_delete(MCTSNode &n, MCTSNode *ignore, bool isroot)
 {
 	if (&n == ignore)
 		return;
 	MCTSNode *nodes = n.begin_nodes();
 	for (int i = 0; i < n.get_num_expanded(); i++)
 	{
-		recursive_delete(nodes[i], ignore);
+		recursive_delete(nodes[i], ignore, false);
 	}
 	if (n.get_num_children() > 0)
 		free(n.begin_children());
+	if (isroot)
+		delete &n;
 }
 
 ostream &operator<<(ostream &os, const Policy &p)

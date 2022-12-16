@@ -103,6 +103,12 @@ class ChessModel(tf.keras.Model):
         self.encoding = tf.keras.layers.Dense(depth, use_bias=True)
         self.chess_layers = [ChessModelLayer(depth, d_fnn) for _ in range(num_layers)]
 
+    @tf.function(
+        input_signature=(
+            tf.TensorSpec(shape=[None, ROWS, COLS], dtype=tf.int32),
+            tf.TensorSpec(shape=[None, METADATA_LENGTH], dtype=tf.int32),
+        )
+    )
     def call(self, board, metadata):
         """
         calls the evaluator

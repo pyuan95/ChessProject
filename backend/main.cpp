@@ -13,5 +13,6 @@ int main()
 	init_move2index_cache();
 	init_tablebase("./tablebase");
 	run_all_tests();
+	tb_free();
 	return 0;
 }

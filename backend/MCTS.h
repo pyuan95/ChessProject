@@ -189,7 +189,14 @@ private:
 
 	inline void reallocate_memory()
 	{
-		int s = sizeof(uint8_t) * 3 * ((int)num_children) + sizeof(MCTSNode) * std::min(num_expanded + 1, (int)num_children);
+		int s;
+		if (num_expanded == 1)
+			s = sizeof(MCTSNode) * std::min(2, (int)num_children);
+		else if (num_expanded % 4 == 3)
+			s = sizeof(MCTSNode) * std::min(3 + (int)num_expanded, (int)num_children);
+		else
+			return;
+		s += sizeof(uint8_t) * 3 * ((int)num_children);
 		void *new_children = realloc(children, s);
 		if (new_children == nullptr)
 		{
@@ -306,7 +313,7 @@ public:
 	MCTSNode() {} // only used for making the array
 };
 
-void recursive_delete(MCTSNode &n, MCTSNode *ignore);
+void recursive_delete(MCTSNode &n, MCTSNode *ignore, bool isroot);
 
 /*
 Represents an MCTS Tree
@@ -357,6 +364,12 @@ private:
 		}
 	}
 
+	inline void delete_root()
+	{
+		if (root != nullptr)
+			recursive_delete(*root, nullptr, true);
+	}
+
 public:
 	// the temperature to use for calculating the policy and selecting the best child by count.
 	float temperature;
@@ -366,8 +379,7 @@ public:
 	inline void set_position(const Position &pos)
 	{
 		this->p = pos;
-		if (root != nullptr)
-			recursive_delete(*root, nullptr);
+		delete_root();
 		if (pos.turn() == WHITE)
 			root = new MCTSNode(WHITE);
 		else
@@ -425,13 +437,13 @@ public:
 	inline void play_best_move_and_reset()
 	{
 		play_best_move();
-		MCTSNode *newroot = new MCTSNode(root->get_color());
+		Color color = root->get_color();
 		bool itp = root->is_terminal_position();
-		if (root != nullptr)
-			delete root;
-		root = newroot;
+		MCTSNode *newroot = new MCTSNode(color);
 		if (itp)
-			root->mark_terminal_position();
+			newroot->mark_terminal_position();
+		delete_root();
+		root = newroot;
 		best_leaf = nullptr;
 		best_leaf_path.clear();
 		best_leaf_path.reserve(200);
@@ -481,7 +493,7 @@ public:
 	~MCTS()
 	{
 		if (root != nullptr)
-			recursive_delete(*root, nullptr);
+			recursive_delete(*root, nullptr, true);
 		if (moves != nullptr)
 			delete[] moves;
 		output.close();

@@ -52,9 +52,8 @@ private:
 
 	int num_working_sectors();
 
-	void wait_until_no_workers();
-
 public:
+	void wait_until_no_workers();
 	// calling this function ensures that the Ndarray corresponding to the current sector has finished being selected and updated
 	void select();
 

@@ -225,20 +225,16 @@ def play(model1, model2, batchmctsoptions: dict):
             out_policy = np.concatenate([out_policy1.numpy(), out_policy2.numpy()], axis=0).astype(np.float32)
             out_q = np.concatenate([out_q1.numpy(), out_q2.numpy()], axis=0).flatten().astype(np.float32)
             batchmcts.update(out_q, out_policy)
-        batchmcts.play_best_moves(reset=False)
+        batchmcts.play_best_moves(reset=True)
         print("finished playing move number {0}".format(movenum))
         print("proportion of games over: {0}".format(batchmcts.proportion_of_games_over()))
         movenum += 1
     results = np.zeros([batch_size], dtype=np.int32)
     batchmcts.results(results)
     results[split:] *= -1  # since model1 plays as black on results[split:]
-    unique, counts = np.unique(results, return_counts=True)
-    scores = dict(zip(unique, counts))
-    if -1 not in scores:
-        scores[-1] = 0
-    if 1 not in scores:
-        scores[1] = 0
-    if 0 not in scores:
-        scores[0] = 0
+    scores = {}
+    for i, r in enumerate([results[:split], results[split:]]):
+        unique, counts = np.unique(r, return_counts=True)
+        scores["black" if i else "white"] = dict(zip(unique, counts))
     scores["results"] = results
     return scores

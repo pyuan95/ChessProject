@@ -57,6 +57,7 @@ public:
     Ndarray<datatype, ndim> deepcopy();
     typename getItemTraits<datatype, ndim>::returnType operator[](unsigned long i);
     void destroy();
+    void init(datatype t);
 };
 
 // Ndarray constructor
@@ -119,6 +120,14 @@ inline void Ndarray<datatype, ndim>::destroy()
     delete[] strides;
 }
 
+template <typename datatype, int ndim>
+inline void Ndarray<datatype, ndim>::init(datatype t)
+{
+    size_t size = this->strides[0] * this->shape[0];
+    for (int i = 0; i < size; i++)
+        this->data[i] = t;
+}
+
 // Ndarray overloaded []-operator.
 // The [i][j][k] selection is recursively replaced by i*strides[0]+j*strides[1]+k*strides[2]
 // at compile time, using template meta-programming. If the axes are not exhausted, return
@@ -153,6 +162,7 @@ public:
     Ndarray<datatype, 1> deepcopy();
     typename getItemTraits<datatype, 1>::returnType operator[](unsigned long i);
     void destroy();
+    void init(datatype t);
 };
 
 // Ndarray partial specialised constructor
@@ -213,6 +223,13 @@ inline void Ndarray<datatype, 1>::destroy()
     delete[] data;
     delete[] shape;
     delete[] strides;
+}
+
+template <typename datatype>
+inline void Ndarray<datatype, 1>::init(datatype t)
+{
+    for (int i = 0; i < this->shape[0]; i++)
+        this->data[i] = t;
 }
 
 // Partial specialised [] operator: for 1D arrays, return an element rather than a subarray

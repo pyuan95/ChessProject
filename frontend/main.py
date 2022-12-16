@@ -5,15 +5,15 @@ import tensorflow as tf
 from constants import *
 
 # BatchMCTS settings
-num_sims_per_move: int = 5
+num_sims_per_move: int = 1600
 temperature: float = 1.0
 autoplay: bool = True
 output_directory = "./games"
 output: str = output_directory + "/game"
-output = ""  # for now...
-num_threads: int = 1
-batch_size: int = 4
-num_sectors: int = 1
+output = ""
+num_threads: int = 8
+batch_size: int = 2048
+num_sectors: int = 2
 cpuct: float = 0.05
 boards: np.ndarray = np.zeros([num_sectors, batch_size, ROWS, COLS], dtype=np.int32)
 boards_reshaped: np.ndarray = boards.reshape([num_sectors * batch_size, ROWS, COLS])
@@ -23,15 +23,15 @@ tablebase_path: str = "../backend/tablebase"
 
 # play options
 play_options = {
-    "num_sims_per_move": 25,
+    "num_sims_per_move": 2000,
     "temperature": 1.0,
     "autoplay": False,
     "output": "",
-    "num_threads": 1,
-    "batch_size": 4,
+    "num_threads": 4,
+    "batch_size": 400,
     "num_sectors": 1,
     "cpuct": 0.05,
-    "tablebase_path": "../backend/tablebase",
+    "tablebase_path": tablebase_path,
 }
 
 # model settings
@@ -77,8 +77,20 @@ def pnl(x):
     log_file.flush()
 
 
+out_policy = np.ones([batch_size, ROWS, COLS, NUM_MOVES_PER_SQUARE], dtype=np.float32)
+out_q = np.zeros([batch_size], dtype=np.float32)
+
+
+while True:
+    batch_mcts.select()
+    cur_sector = batch_mcts.current_sector()
+    b = boards[cur_sector]
+    m = metadata[cur_sector]
+    batch_mcts.update(out_q, out_policy)
+
 # does inference using batch_mcts
 def inference(loop_num):
+    pnl("began inference loop {0}!".format(loop_num))
     for i in range(num_moves_per_inference * num_sims_per_move):
         batch_mcts.select()
         cur_sector = batch_mcts.current_sector()
@@ -92,6 +104,8 @@ def inference(loop_num):
                     i // num_sims_per_move, num_moves_per_inference, loop_num
                 )
             )
+        if i % num_sims_per_move == 0 and i:
+            print("finished move", i // num_sims_per_move)
     pnl("finished inference loop {0}!".format(loop_num))
 
 
@@ -124,16 +138,23 @@ def train(loopidx):
     pnl("finished train loop {0}! loss was {1}".format(loopidx, train_loss.result().numpy()))
 
 
-# index = 0
-# while True:
-#     inference(index)
-#     train(index)
-#     manager.save()
-#     index += 1
+index = 0
+while True:
+    inference(index)
+    train(index)
+    manager.save()
+    if index and index % 10 == 0:
+        pnl("playing games...")
+        model2 = ChessModel(num_layers, depth, d_fnn)
+        checkpoint2 = tf.train.Checkpoint(model=model2)
+        manager2 = tf.train.CheckpointManager(checkpoint2, directory=checkpoint_dir, max_to_keep=10)
+        status = checkpoint2.restore(manager2.checkpoints()[0])
 
-model2 = ChessModel(num_layers, depth, d_fnn)
-play(
-    model,
-    model2,
-    play_options,
-)
+        results = play(
+            model,
+            model2,
+            play_options,
+        )
+        results.pop("results")  # dont wanna see this array...
+        pnl("Game Results: {0}".format(results))
+    index += 1

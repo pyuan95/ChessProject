@@ -51,3 +51,16 @@ Training on 21 games! Guessing 20.5078125 batches
 finished train loop 1! loss was 2.3951456546783447
 finished inference move 100/500 in loop 0!
 finished inference move 200/500 in loop 0!
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!

@@ -772,15 +772,16 @@ void test_select_best_move_correctly()
 
 void batch_mcts_test()
 {
-	int iterations = 10000;
-	int num_sims_per_move = 500;
+	int iterations = 25000;
+	int num_sims_per_move = 10;
 	float temperature = 1.0;
 	bool autoplay = true;
 	string output = "./games/game";
+	output = "";
 
-	int num_threads = 8;
-	int batch_size = 5;
-	int num_sectors = 1;
+	int num_threads = 2;
+	int batch_size = 8;
+	int num_sectors = 2;
 	float cpuct = 1.0;
 
 	Ndarray<int, 3> boards(
@@ -802,6 +803,10 @@ void batch_mcts_test()
 		new int[batch_size * num_sectors * METADATA_LENGTH],
 		new long[2]{batch_size * num_sectors, METADATA_LENGTH},
 		new long[2]{METADATA_LENGTH, 1});
+
+	boards.init(0);
+	q.init(0.0);
+	metadata.init(0);
 
 	for (int a = 0; a < batch_size; a++)
 	{
@@ -853,6 +858,8 @@ void batch_mcts_test()
 		new long[1]{METADATA_LENGTH},
 		new long[1]{1});
 
+	board_baseline.init(0);
+	metadata_baseline.init(0);
 	for (int i = 0; i < ROWS; i++)
 	{
 		for (int j = 0; j < COLS; j++)
@@ -873,6 +880,17 @@ void batch_mcts_test()
 	stop = high_resolution_clock::now();
 	duration = duration_cast<milliseconds>(stop - start);
 	cout << "baseline speed: " << 1000.0f * 100000 / duration.count() << " sims per second\n";
+
+	delete mcts;
+	m.wait_until_no_workers();
+
+	boards.destroy();
+	policy.destroy();
+	metadata.destroy();
+	q.destroy();
+	dummy_policy.destroy();
+	board_baseline.destroy();
+	metadata_baseline.destroy();
 }
 
 void test_ndarray_copy()
@@ -1084,11 +1102,12 @@ void not_autoplay_test_batchmcts()
 
 void run_all_tests()
 {
-	print_test(&not_autoplay_test, "not autoplay test");
-	print_test(&not_autoplay_test_batchmcts, "not autoplay test batchmcts version");
-	if (true)
+	print_test(&batch_mcts_test, "batch mcts");
+	if (false)
 	{
-		// print_test(&batch_mcts_test, "batch mcts");
+		print_test(&batch_mcts_test, "batch mcts");
+		print_test(&not_autoplay_test, "not autoplay test");
+		print_test(&not_autoplay_test_batchmcts, "not autoplay test batchmcts version");
 		print_test(&tablebase_test, "Tablebase Test");
 		print_test(&policy_completeness_test, "Policy Completeness Test");
 		print_test(&test_metadata, "metadata test");
