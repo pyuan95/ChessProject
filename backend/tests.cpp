@@ -770,17 +770,88 @@ void test_select_best_move_correctly()
 	assert(child.first == prev_best);
 }
 
-void batch_mcts_test()
+void batch_mcts_testcorrectness()
 {
-	int iterations = 25000;
-	int num_sims_per_move = 10;
+
+	int iterations = 1000;
+	int num_sims_per_move = 1600;
 	float temperature = 1.0;
 	bool autoplay = true;
 	string output = "./games/game";
 	output = "";
 
-	int num_threads = 2;
-	int batch_size = 8;
+	int num_threads = 4;
+	int batch_size = 512;
+	int num_sectors = 2;
+	float cpuct = 1.0;
+
+	Ndarray<int, 3> boards(
+		new int[batch_size * num_sectors * ROWS * COLS],
+		new long[3]{batch_size * num_sectors, ROWS, COLS},
+		new long[3]{ROWS * COLS, COLS, 1});
+
+	Ndarray<float, 4> policy(
+		new float[batch_size * ROWS * COLS * MOVES_PER_SQUARE](),
+		new long[4]{batch_size, ROWS, COLS, MOVES_PER_SQUARE},
+		new long[4]{ROWS * COLS * MOVES_PER_SQUARE, COLS * MOVES_PER_SQUARE, MOVES_PER_SQUARE, 1});
+
+	Ndarray<float, 1> q(
+		new float[batch_size],
+		new long[1]{batch_size},
+		new long[1]{1});
+
+	Ndarray<int, 2> metadata(
+		new int[batch_size * num_sectors * METADATA_LENGTH],
+		new long[2]{batch_size * num_sectors, METADATA_LENGTH},
+		new long[2]{METADATA_LENGTH, 1});
+
+	boards.init(0);
+	q.init(0.0);
+	metadata.init(0);
+
+	for (int a = 0; a < batch_size; a++)
+	{
+		for (int i = 0; i < ROWS; i++)
+		{
+			for (int j = 0; j < COLS; j++)
+			{
+				for (int k = 0; k < MOVES_PER_SQUARE; k++)
+				{
+					policy[a][i][j][k] = 10.0f * std::rand() / RAND_MAX;
+				}
+			}
+		}
+	}
+
+	BatchMCTS m(
+		num_sims_per_move, temperature, autoplay, output, num_threads, batch_size, num_sectors, cpuct, boards, metadata);
+
+	for (int i = 0; i < iterations * num_sectors; i++)
+	{
+		m.select();
+		m.update(q, policy);
+	}
+
+	m.wait_until_no_workers();
+	std::vector counts = m.sim_counts();
+	for (int i = 0; i < batch_size; i++)
+	{
+		// std::cout << m.arr[i].current_sims() << "\n";
+		assert(counts[i] == iterations);
+	}
+}
+
+void batch_mcts_test()
+{
+	int iterations = 25000;
+	int num_sims_per_move = 1600;
+	float temperature = 1.0;
+	bool autoplay = true;
+	string output = "./games/game";
+	output = "";
+
+	int num_threads = 4;
+	int batch_size = 512;
 	int num_sectors = 2;
 	float cpuct = 1.0;
 
@@ -1102,6 +1173,7 @@ void not_autoplay_test_batchmcts()
 
 void run_all_tests()
 {
+	print_test(&batch_mcts_testcorrectness, "batch mcts corectness");
 	print_test(&batch_mcts_test, "batch mcts");
 	if (false)
 	{

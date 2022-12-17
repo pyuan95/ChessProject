@@ -23,7 +23,6 @@ class BatchMCTS
 private:
 	float cpuct;
 
-	std::vector<MCTS> arr;
 	int num_threads;
 	int batch_size;
 	int num_sectors;
@@ -31,6 +30,7 @@ private:
 	Ndarray<int, 2> metadata; // (batch_size * num_sectors, 5)
 
 	int cur_sector;
+	std::vector<MCTS> arr;
 	std::vector<Sector> working_sectors;
 	std::mutex no_workers_mutex;		  // mutex for wait_until_no_workers
 	std::mutex queue_consumer_mutex;	  // mutex for queue_consumer
@@ -45,6 +45,8 @@ private:
 	void update_sector(int sector, Ndarray<float, 1> q, Ndarray<float, 4> policy);
 
 	void process_thread(Ndarray<float, 1> q, Ndarray<float, 4> policy, int &next, const int target, std::mutex &m);
+
+	void process_thread2(Ndarray<float, 1> q, Ndarray<float, 4> policy, int start, int end, int target);
 
 	void queue_consumer();
 
@@ -112,6 +114,15 @@ public:
 		return cur_sector;
 	}
 
+	// for testing
+	inline std::vector<int> sim_counts()
+	{
+		std::vector<int> res;
+		for (MCTS &m : arr)
+			res.push_back(m.current_sims());
+		return res;
+	}
+
 	BatchMCTS(
 		int num_sims_per_move,
 		float temperature,
@@ -122,20 +133,19 @@ public:
 		int num_sectors,
 		float cpuct,
 		Ndarray<int, 3> boards,
-		Ndarray<int, 2> metadata)
-		: num_threads(num_threads),
-		  batch_size(batch_size),
-		  num_sectors(num_sectors),
-		  cpuct(cpuct),
-		  boards(boards),
-		  metadata(metadata),
-		  working_sectors(
-			  num_sectors,
-			  Sector(
-				  -1,
-				  Ndarray<float, 1>(nullptr, nullptr, nullptr),
-				  Ndarray<float, 4>(nullptr, nullptr, nullptr))),
-		  cur_sector(0)
+		Ndarray<int, 2> metadata) : num_threads(num_threads),
+									batch_size(batch_size),
+									num_sectors(num_sectors),
+									cpuct(cpuct),
+									boards(boards),
+									metadata(metadata),
+									working_sectors(
+										num_sectors,
+										Sector(
+											-1,
+											Ndarray<float, 1>(nullptr, nullptr, nullptr),
+											Ndarray<float, 4>(nullptr, nullptr, nullptr))),
+									cur_sector(0)
 	{
 		if (boards.getShape(0) != batch_size * num_sectors || boards.getShape(1) != ROWS || boards.getShape(2) != COLS)
 		{

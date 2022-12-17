@@ -83,7 +83,7 @@ class BatchMCTS:
         q = c_ndarray(q_)
         policy = c_ndarray(policy_)
         self.update_cache.append((q, policy, q_, policy_))
-        if len(self.update_cache) > self.num_sectors * 4:
+        while len(self.update_cache) > self.num_sectors * 4:
             self.update_cache.popleft()
         BatchMCTSExtension.update(self.ptr, q, policy)
 

@@ -75,6 +75,16 @@ void BatchMCTS::process_thread(Ndarray<float, 1> q, Ndarray<float, 4> policy, in
 	}
 }
 
+void BatchMCTS::process_thread2(Ndarray<float, 1> q, Ndarray<float, 4> policy, int start, int end, int target)
+{
+	for (int cur = start; cur < end; cur++)
+	{
+		int policy_index = cur - (target - batch_size);
+		arr[cur].update(q[policy_index], policy[policy_index]);
+		arr[cur].select(cpuct, boards[cur], metadata[cur]);
+	}
+}
+
 void BatchMCTS::queue_consumer()
 {
 	while (alive)
@@ -100,13 +110,25 @@ void BatchMCTS::update_sector(int sector, Ndarray<float, 1> q, Ndarray<float, 4>
 {
 	int next = sector * batch_size;
 	int target = next + batch_size;
-	std::mutex m;
+	// std::mutex m;
 	std::vector<std::thread> threads;
+	/*
+		for (int i = 0; i < num_threads; i++)
+		{
+			std::thread thd(&BatchMCTS::process_thread, this, q, policy, std::ref(next), target, std::ref(m));
+			threads.push_back(std::move(thd));
+		} */
+
 	for (int i = 0; i < num_threads; i++)
 	{
-		std::thread thd(&BatchMCTS::process_thread, this, q, policy, std::ref(next), target, std::ref(m));
+		int start = (int)((1.0 * i / num_threads) * batch_size);
+		int end = (int)(1.0 * (i + 1) / num_threads * batch_size);
+		if (i == num_threads - 1)
+			end = batch_size;
+		std::thread thd(&BatchMCTS::process_thread2, this, q, policy, start + next, end + next, target);
 		threads.push_back(std::move(thd));
 	}
+
 	for (std::thread &t : threads)
 	{
 		t.join();
