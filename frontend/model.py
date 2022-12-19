@@ -44,7 +44,7 @@ class ChessModelLayer(tf.keras.layers.Layer):
         self.ffn = tf.keras.Sequential(
             [
                 tf.keras.layers.Dense(d_ffn, activation="relu"),
-                tf.keras.layers.Dense(depth, activation="relu"),
+                tf.keras.layers.Dense(depth, activation="sigmoid"),
             ]
         )
 

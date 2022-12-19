@@ -833,12 +833,9 @@ void batch_mcts_testcorrectness()
 	}
 
 	m.wait_until_no_workers();
-	std::vector counts = m.sim_counts();
+	std::vector<int> counts = m.sim_counts();
 	for (int i = 0; i < batch_size; i++)
-	{
-		// std::cout << m.arr[i].current_sims() << "\n";
 		assert(counts[i] == iterations);
-	}
 }
 
 void batch_mcts_test()
