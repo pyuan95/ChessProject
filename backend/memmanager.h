@@ -1,38 +1,47 @@
 #include <vector>
 #include <unordered_map>
 #include <stdint.h>
-
+#include <cstring>
 class MemoryManager
 {
 public:
-    virtual char *malloc_(uint32_t size);
-    virtual char *realloc_(char *ptr, uint32_t prevsize, uint32_t newsize);
-    virtual void free_(char *ptr, uint32_t size);
+    virtual uint8_t *malloc_(uint32_t size) = 0;
+    virtual uint8_t *realloc_(uint8_t *ptr, uint32_t prevsize, uint32_t newsize) = 0;
+    virtual void free_(uint8_t *ptr, uint32_t size) = 0;
+    virtual uint32_t memory_until_wall() = 0;
+    virtual uint32_t size() = 0;
+    virtual int64_t resize(uint32_t size) = 0;
+    virtual void reset() = 0;
 };
 
 class DefaultMemoryManager : public MemoryManager
 {
-    inline char *malloc_(uint32_t size) { return (char *)malloc(size); }
-    inline char *realloc_(char *ptr, uint32_t prevsize, uint32_t newsize) { return (char *)realloc(ptr, newsize); }
-    inline void free_(char *ptr, uint32_t size) { free(ptr); }
+    inline uint8_t *malloc_(uint32_t size) { return (uint8_t *)malloc(size); }
+    inline uint8_t *realloc_(uint8_t *ptr, uint32_t prevsize, uint32_t newsize) { return (uint8_t *)realloc(ptr, newsize); }
+    inline void free_(uint8_t *ptr, uint32_t size) { free(ptr); }
+    inline uint32_t memory_until_wall() { return std::numeric_limits<uint32_t>::max(); }
+    inline uint32_t size() { return std::numeric_limits<uint32_t>::max(); }
+    inline int64_t resize(uint32_t size) { throw std::runtime_error("cannot resize DefaultMemoryManager!"); }
+    inline void reset() {}
 };
 
 class MemoryBlock : public MemoryManager
 {
 
 private:
-    uint32_t starting_size;
-    char *memory;
-    char *frontier;
-    char *wall;
+    uint32_t const starting_allocation_size;
+    uint32_t const starting_blocksize;
+    uint8_t *memory;
+    uint8_t *frontier;
+    uint8_t *wall;
     std::unordered_map<uint32_t, std::vector<uint32_t>> recycling;
 
 public:
-    // cannot hold more than starting_size * 2^32 bytes!
+    // cannot hold more than starting_allocation_size * 2^32 bytes!
     MemoryBlock(uint32_t blocksize_,
-                uint32_t starting_size_) : starting_size(starting_size_)
+                uint32_t starting_size_) : starting_allocation_size(starting_size_), starting_blocksize(blocksize_)
     {
-        memory = (char *)malloc(blocksize_);
+        memory = (uint8_t *)malloc(blocksize_);
         frontier = memory;
         wall = memory + blocksize_;
     }
@@ -42,11 +51,27 @@ public:
         free(memory);
     }
 
+    MemoryBlock(MemoryBlock &&other) : starting_blocksize(other.starting_blocksize), starting_allocation_size(other.starting_allocation_size)
+    {
+        recycling = std::move(other.recycling);
+        std::swap(memory, other.memory);
+        std::swap(frontier, other.frontier);
+        std::swap(wall, other.wall);
+    }
+
     MemoryBlock(MemoryBlock const &other) = delete;
-    MemoryBlock operator=(MemoryBlock other) = delete;
+    MemoryBlock &operator=(MemoryBlock other) = delete;
 
     // returns the number of bytes remaining that are available in this block
-    inline uint32_t memory_until_wall() { return wall - frontier; }
+    inline uint32_t memory_until_wall()
+    {
+        if (frontier < wall)
+            return wall - frontier;
+        else
+            return 0;
+    }
+
+    inline uint32_t size() { return wall - memory; }
 
     inline uint32_t count_free_memory()
     {
@@ -56,61 +81,20 @@ public:
         return tot + memory_until_wall();
     }
 
+    inline void reset()
+    {
+        memory = (uint8_t *)realloc(memory, starting_blocksize);
+        frontier = memory;
+        wall = memory + starting_blocksize;
+        recycling.clear();
+    }
+
     // returns nullptr if allocation was unsuccessful,
     // and the pointer otherwise
-    char *malloc_(uint32_t size);
-    // requires: newsize >= prevsize
-    char *realloc_(char *ptr, uint32_t prevsize, uint32_t newsize);
-    void free_(char *ptr, uint32_t size);
-    // resizes the underlying memory array and returns the new address
-    char *resize(uint32_t size);
+    uint8_t *malloc_(uint32_t size);
+    uint8_t *realloc_(uint8_t *ptr, uint32_t prevsize, uint32_t newsize);
+    void free_(uint8_t *ptr, uint32_t size);
+    // resizes the underlying memory array and returns new_address - old_address
+    // add the return value to each pointer allocated to get new valid pointer
+    int64_t resize(uint32_t size);
 };
-
-char *MemoryBlock::resize(uint32_t size)
-{
-    char *newmemory = (char *)realloc(memory, size);
-    int diff = newmemory - memory;
-    memory = newmemory;
-    frontier += diff;
-    wall = memory + size;
-
-    return memory;
-}
-
-char *MemoryBlock::malloc_(uint32_t size)
-{
-    uint32_t cur = starting_size;
-    while (cur < size)
-        cur += cur;
-    if (recycling.count(cur) && recycling[cur].size() > 0)
-    {
-        uint32_t displacement = recycling[cur].back();
-        recycling[cur].pop_back();
-        return memory + displacement * starting_size;
-    }
-    if (frontier + cur > wall)
-        return nullptr;
-    char *result = frontier;
-    frontier += cur;
-    return result;
-}
-
-char *MemoryBlock::realloc_(char *ptr, uint32_t prevsize, uint32_t newsize)
-{
-    uint32_t cur = starting_size;
-    while (cur < prevsize)
-        cur += cur;
-    if (newsize <= cur)
-        return ptr;
-    free_(ptr, prevsize);
-    return malloc_(newsize);
-}
-
-void MemoryBlock::free_(char *ptr, uint32_t size)
-{
-    uint32_t cur = starting_size;
-    while (cur < size)
-        cur += cur;
-    uint32_t displacement = (ptr - memory) / starting_size;
-    recycling[cur].push_back(displacement);
-}

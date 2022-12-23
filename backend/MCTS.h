@@ -6,10 +6,12 @@
 #include <cmath>
 #include <fstream>
 #include <unordered_set>
+#include <memory>
 #include "Constants.h"
 #include "position.h"
 #include "tables.h"
 #include "float.h"
+#include "memmanager.h"
 using namespace std;
 
 // stores the indices in the policy array
@@ -187,31 +189,26 @@ private:
 
 	inline MCTSNode &get_node_at(int node_num) { return begin_nodes()[node_num]; }
 
-	inline void reallocate_memory()
+	inline uint32_t size_of_children() { return sizeof(uint8_t) * 3 * ((uint32_t)num_children) + sizeof(MCTSNode) * num_expanded; }
+
+	inline void reallocate_memory(MemoryManager &m)
 	{
-		int s;
-		if (num_expanded == 1)
-			s = sizeof(MCTSNode) * std::min(2, (int)num_children);
-		else if (num_expanded % 4 == 3)
-			s = sizeof(MCTSNode) * std::min(3 + (int)num_expanded, (int)num_children);
-		else
-			return;
-		s += sizeof(uint8_t) * 3 * ((int)num_children);
-		void *new_children = realloc(children, s);
-		if (new_children == nullptr)
+		uint32_t newsize = size_of_children();
+		uint32_t prevsize = newsize - sizeof(MCTSNode);
+		uint8_t *new_children = m.realloc_(children, prevsize, newsize);
+		if (!new_children)
 		{
 			std::cout << "error reallocing children. exiting...";
-			free(children);
 			exit(1);
 		}
-		children = (uint8_t *)new_children;
+		children = new_children;
 	}
 
-	inline void init_memory()
+	inline void init_memory(MemoryManager &m)
 	{
-		int s = sizeof(uint8_t) * 3 * ((int)num_children);
-		children = (uint8_t *)malloc(s);
-		if (children == nullptr)
+		uint32_t s = size_of_children();
+		children = m.malloc_(s);
+		if (!children)
 		{
 			std::cout << "error allocating children. exiting...";
 			exit(1);
@@ -219,7 +216,7 @@ private:
 	}
 
 	// adds a leaf to the nodes
-	MCTSNode *add_leaf();
+	MCTSNode *add_leaf(MemoryManager &m);
 
 public:
 	inline size_t get_num_expanded() { return num_expanded; }
@@ -254,6 +251,13 @@ public:
 
 	inline uint8_t *end_leaves() { return children + ((long long)(num_children * 3)); }
 
+	// for use with MemoryBlock
+	inline void shift_children(int64_t diff)
+	{
+		if (children)
+			children += diff;
+	}
+
 	// the q value must be calculated given the color of the node.
 	void backup(float q);
 
@@ -265,7 +269,8 @@ public:
 		Ndarray<float, 3> &policy,
 		const Move *moves,
 		size_t size,
-		vector<pair<Move, float>> &leaves);
+		vector<pair<Move, float>> &leaves,
+		MemoryManager &m);
 
 	// returns the number of nodes currently under this tree.
 	size_t size();
@@ -292,13 +297,15 @@ public:
 
 	// returns the child with the highest upper bound according to the PUCT algorithm.
 	// if it has no children then null is returned.
-	void select_best_child(const float cpuct, std::pair<MCTSNode *, Move> &child);
+	void select_best_child(const float cpuct, std::pair<MCTSNode *, Move> &child, MemoryManager &m);
 
 	// returns the child to play based on visit count with the given temperature parameter.
 	// if there are no children that are not leaves, nullptr is returned.
 	// this can happen when the current node is a leaf (could be terminal position), or if
 	// this node was never selected for expansion.
 	std::pair<MCTSNode *, Move> select_best_child_by_count(float temperature = 1.0);
+
+	static void recursive_delete(MCTSNode &n, MCTSNode *ignore, bool isroot, MemoryManager &m);
 
 	MCTSNode(Color c) : color_itp(0),
 						num_children(0),
@@ -313,8 +320,6 @@ public:
 	MCTSNode() {} // only used for making the array
 };
 
-void recursive_delete(MCTSNode &n, MCTSNode *ignore, bool isroot);
-
 /*
 Represents an MCTS Tree
 CLass invariant: root -> color == p.turn().
@@ -322,6 +327,10 @@ CLass invariant: root -> color == p.turn().
 class MCTS
 {
 private:
+	static uint32_t const default_block_size = 640000;
+	static uint32_t const default_starting_size = 100;
+	static uint32_t const max_possible_allocation_request = MAX_MOVES * (3 + sizeof(MCTSNode) + 3) * 2;
+
 	MCTSNode *root;
 	MCTSNode *best_leaf;
 	Move *moves;
@@ -337,6 +346,7 @@ private:
 	int move_num;
 	int game_num;
 	int tablebase_eval; // >= 2 means no eval; -1, 0, 1 mean it's been set
+	std::shared_ptr<MemoryManager> memory_manager;
 
 	// adds a move to the current game
 	// we want to pass by value bc board_state, p, m, c, are made on stack.
@@ -367,7 +377,18 @@ private:
 	inline void delete_root()
 	{
 		if (root != nullptr)
-			recursive_delete(*root, nullptr, true);
+			MCTSNode::recursive_delete(*root, nullptr, true, *memory_manager);
+		memory_manager->reset();
+	}
+
+	// requires: node has already been shifted (is a valid pointer)
+	inline void shift_tree(MCTSNode *node, int64_t diff)
+	{
+		if (!node)
+			return;
+		node->shift_children(diff);
+		for (int i = 0; i < node->get_num_expanded(); i++)
+			shift_tree(node->begin_nodes() + i, diff);
 	}
 
 public:
@@ -481,19 +502,29 @@ public:
 	void update(const float q, Ndarray<float, 3> policy);
 
 	// auto-auto_play: whether to automatically play the next move when num_sims_to_play is reached
-	MCTS(const int num_sims_per_move, float t = 1.0, bool auto_play = true, string output = "") : root(new MCTSNode(WHITE)), best_leaf(nullptr), best_leaf_path(), p(),
-																								  sim_limit(num_sims_per_move), temperature(t), default_temp(t),
-																								  auto_play(auto_play), moves(new Move[MAX_MOVES]), nmoves(0), leaves(MAX_MOVES, pair<Move, float>(0, 0.0f)),
-																								  move_num(1), game_num(1), output_path_base(output), tablebase_eval(2)
+	MCTS(const int num_sims_per_move,
+		 std::shared_ptr<MemoryManager> mm,
+		 float t = 1.0,
+		 bool auto_play = true,
+		 string output = "") : root(new MCTSNode(WHITE)), best_leaf(nullptr), best_leaf_path(), p(),
+							   sim_limit(num_sims_per_move), temperature(t), default_temp(t),
+							   auto_play(auto_play), moves(new Move[MAX_MOVES]), nmoves(0), leaves(MAX_MOVES, pair<Move, float>(0, 0.0f)),
+							   move_num(1), game_num(1), output_path_base(output), tablebase_eval(2), memory_manager(mm)
 	{
 		update_output();
 		best_leaf_path.reserve(200);
 	}
 
+	MCTS(const int num_sims_per_move,
+		 float t = 1.0,
+		 bool auto_play = true,
+		 string output = "") : MCTS(num_sims_per_move,
+									std::make_shared<MemoryBlock>(default_block_size, default_starting_size),
+									t, auto_play, output) {}
 	~MCTS()
 	{
 		if (root != nullptr)
-			recursive_delete(*root, nullptr, true);
+			MCTSNode::recursive_delete(*root, nullptr, true, *memory_manager);
 		if (moves != nullptr)
 			delete[] moves;
 		output.close();
@@ -519,7 +550,8 @@ public:
 			   move_num(other.move_num),
 			   game_num(other.game_num),
 			   temperature(other.temperature),
-			   tablebase_eval(other.tablebase_eval)
+			   tablebase_eval(other.tablebase_eval),
+			   memory_manager(std::move(other.memory_manager))
 	{
 		other.root = nullptr;
 		other.moves = nullptr;

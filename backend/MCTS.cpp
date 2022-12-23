@@ -53,16 +53,16 @@ void move2index(const Position &p, Move m, Color color, PolicyIndex &policyIndex
 	policyIndex.i = move2index_cache[static_cast<int>(color)][static_cast<int>(pt)][m.get_representation()];
 }
 
-MCTSNode *MCTSNode::add_leaf()
+MCTSNode *MCTSNode::add_leaf(MemoryManager &m)
 {
 	num_expanded++;
-	reallocate_memory();
+	reallocate_memory(m);
 	get_node_at(num_expanded - 1) = MCTSNode(~get_color());
 
 	return begin_nodes() + num_expanded - 1;
 }
 
-void MCTSNode::select_best_child(const float cpuct, std::pair<MCTSNode *, Move> &child)
+void MCTSNode::select_best_child(const float cpuct, std::pair<MCTSNode *, Move> &child, MemoryManager &m)
 {
 	MCTSNode *res = nullptr;
 	Move best_move(0);
@@ -92,7 +92,7 @@ void MCTSNode::select_best_child(const float cpuct, std::pair<MCTSNode *, Move> 
 	if (res == nullptr && num_expanded < num_children)
 	{
 		// the best leaf won!
-		res = add_leaf();
+		res = add_leaf(m);
 	}
 	child.first = res;
 	child.second = best_move;
@@ -178,13 +178,14 @@ void MCTSNode::expand(
 	Ndarray<float, 3> &policy,
 	const Move *moves,
 	size_t size,
-	vector<pair<Move, float>> &leaves)
+	vector<pair<Move, float>> &leaves,
+	MemoryManager &m)
 {
 	if (!is_terminal_position() && is_leaf() && size > 0)
 	{
 		// first, initialize the memory for children
 		num_children = (uint8_t)size;
-		init_memory();
+		init_memory(m);
 
 		float tot = 0;
 		PolicyIndex policyIndex;
@@ -284,17 +285,20 @@ size_t MCTSNode::size()
 
 bool MCTS::select(const float cpuct, Ndarray<int, 2> board, Ndarray<int, 1> metadata)
 {
-	return select_helper(cpuct, board, metadata);
-}
 
-bool MCTS::select_helper(const float cpuct, Ndarray<int, 2> &board, Ndarray<int, 1> &metadata)
-{
+	// first, check if we have enough memory
+	while (memory_manager->memory_until_wall() <= max_possible_allocation_request)
+	{
+		int64_t diff = memory_manager->resize(memory_manager->size() * 2);
+		if (diff != 0)
+			shift_tree(root, diff);
+	}
 	MCTSNode *cur = root;
 	best_leaf_path.emplace_back(cur, 0);
 	std::pair<MCTSNode *, Move> child(0, 0);
 	while (!(cur->is_leaf()))
 	{
-		cur->select_best_child(cpuct, child);
+		cur->select_best_child(cpuct, child, *memory_manager);
 		if (cur->get_color() == WHITE)
 			p.play<WHITE>(child.second);
 		else
@@ -405,9 +409,8 @@ void MCTS::play_best_move()
 		p.play<WHITE>(m);
 	else
 		p.play<BLACK>(m);
-
 	MCTSNode *newroot = new MCTSNode(*(best_child.first)); // shallow copy the best child
-	recursive_delete(*root, best_child.first, true);
+	MCTSNode::recursive_delete(*root, best_child.first, true, *memory_manager);
 	root = newroot;
 
 	// add the move to the game.
@@ -469,11 +472,11 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 	Color best_leaf_color = best_leaf->get_color();
 	if (nmoves > 0 && best_leaf_color == WHITE)
 	{
-		best_leaf->expand(p, policy, moves, nmoves, leaves);
+		best_leaf->expand(p, policy, moves, nmoves, leaves, *memory_manager);
 	}
 	else if (nmoves > 0 && best_leaf_color == BLACK)
 	{
-		best_leaf->expand(p, policy, moves, nmoves, leaves);
+		best_leaf->expand(p, policy, moves, nmoves, leaves, *memory_manager);
 	}
 
 	best_leaf = nullptr;
@@ -501,17 +504,17 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 		play_best_move();
 }
 
-void recursive_delete(MCTSNode &n, MCTSNode *ignore, bool isroot)
+void MCTSNode::recursive_delete(MCTSNode &n, MCTSNode *ignore, bool isroot, MemoryManager &m)
 {
 	if (&n == ignore)
 		return;
 	MCTSNode *nodes = n.begin_nodes();
 	for (int i = 0; i < n.get_num_expanded(); i++)
 	{
-		recursive_delete(nodes[i], ignore, false);
+		recursive_delete(nodes[i], ignore, false, m);
 	}
 	if (n.get_num_children() > 0)
-		free(n.begin_children());
+		m.free_(n.begin_children(), n.size_of_children());
 	if (isroot)
 		delete &n;
 }

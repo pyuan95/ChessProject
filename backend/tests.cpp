@@ -36,6 +36,7 @@ static bool writeLegalMoves(Position &p, int moves[ROWS][COLS][MOVES_PER_SQUARE]
 
 void test_move_set()
 {
+	DefaultMemoryManager memmanager;
 	MCTSNode m(WHITE);
 	Position p;
 	MoveList<WHITE> moves(p);
@@ -61,7 +62,7 @@ void test_move_set()
 		}
 	}
 
-	m.expand(p, policy, moves.begin(), moves.size(), leaves);
+	m.expand(p, policy, moves.begin(), moves.size(), leaves, memmanager);
 	assert(m.get_num_children() == moves.size());
 
 	uint8_t prev = 0xff;
@@ -625,6 +626,10 @@ void memory_test()
 			new long[1]{METADATA_LENGTH},
 			new long[1]{1});
 
+		metadata.init(0);
+		board.init(0);
+		dummy_policy.init(0.1);
+
 		while (m->current_sims() < SIMS)
 		{
 			m->select(CPUCT, board, metadata);
@@ -637,6 +642,59 @@ void memory_test()
 		std::cout << "Number of sims ran: " << m->current_sims() << "\n";
 
 		delete m;
+	}
+}
+
+void test_memmanager()
+{
+	MemoryBlock memblock(640000, 20);
+	std::vector<std::pair<uint8_t *, uint32_t>> test;
+	std::vector<std::pair<uint8_t *, uint32_t>> reference;
+	for (int i = 0; i < 300; i++)
+	{
+		uint32_t size = (rand() * 1.0 / RAND_MAX) * 200;
+		uint8_t *test_ptr = memblock.malloc_(size);
+		uint8_t *ref_ptr = (uint8_t *)malloc(size);
+		for (int j = 0; j < size; j++)
+		{
+			test_ptr[j] = rand();
+			ref_ptr[j] = test_ptr[j];
+		}
+		test.push_back({test_ptr, size});
+		reference.push_back({ref_ptr, size});
+	}
+
+	for (int i = 0; i < 300; i++)
+	{
+		for (int j = 0; j < reference[i].second; j++)
+			assert(test[i].first[j] == reference[i].first[j]);
+	}
+	std::cout << "passed before free()\n";
+
+	for (int i = 0; i < 150; i++)
+	{
+		memblock.free_(test[i].first, test[i].second);
+		free(reference[i].first);
+	}
+
+	for (int i = 0; i < 150; i++)
+	{
+		uint32_t size = (rand() * 1.0 / RAND_MAX) * 200;
+		uint8_t *test_ptr = memblock.malloc_(size);
+		uint8_t *ref_ptr = (uint8_t *)malloc(size);
+		for (int j = 0; j < size; j++)
+		{
+			test_ptr[j] = rand();
+			ref_ptr[j] = test_ptr[j];
+		}
+		test[i] = {test_ptr, size};
+		reference[i] = {ref_ptr, size};
+	}
+
+	for (int i = 0; i < 300; i++)
+	{
+		for (int j = 0; j < reference[i].second; j++)
+			assert(test[i].first[j] == reference[i].first[j]);
 	}
 }
 
@@ -723,6 +781,7 @@ void test_updated_q()
 
 void test_select_best_move_correctly()
 {
+	DefaultMemoryManager memmanager;
 	MCTSNode m(WHITE);
 	Position p;
 	MoveList<WHITE> moves(p);
@@ -744,29 +803,29 @@ void test_select_best_move_correctly()
 		}
 	}
 
-	m.expand(p, policy, moves.begin(), moves.size(), leaves);
+	m.expand(p, policy, moves.begin(), moves.size(), leaves, memmanager);
 	std::pair<MCTSNode *, Move> child(0, 0);
-	m.select_best_child(0.01f, child);
+	m.select_best_child(0.01f, child, memmanager);
 	child.first->backup(-100.0f); // really good for us now
 	MCTSNode *prev_best = child.first;
-	m.select_best_child(0.01f, child);
+	m.select_best_child(0.01f, child, memmanager);
 	assert(child.first == prev_best);
 
 	child.first->backup(1000); // now really bad for us; next node should be a new one;
 	prev_best = child.first;
-	m.select_best_child(0.01f, child);
+	m.select_best_child(0.01f, child, memmanager);
 	assert(child.first == ((MCTSNode *)m.begin_nodes()) + 1);
 
 	child.first->backup(1000); // now really bad for us; next node should be a new one;
 	prev_best = child.first;
-	m.select_best_child(0.01f, child);
+	m.select_best_child(0.01f, child, memmanager);
 	assert(child.first == ((MCTSNode *)m.begin_nodes()) + 2);
 
 	child.first->backup(-1000); // now really good for us; next node should be the same one;
 	prev_best = child.first;
-	m.select_best_child(0.01f, child);
-	m.select_best_child(0.01f, child);
-	m.select_best_child(0.01f, child);
+	m.select_best_child(0.01f, child, memmanager);
+	m.select_best_child(0.01f, child, memmanager);
+	m.select_best_child(0.01f, child, memmanager);
 	assert(child.first == prev_best);
 }
 
@@ -847,9 +906,9 @@ void batch_mcts_test()
 	string output = "./games/game";
 	output = "";
 
-	int num_threads = 4;
-	int batch_size = 512;
-	int num_sectors = 2;
+	int num_threads = 1;
+	int batch_size = 1;
+	int num_sectors = 1;
 	float cpuct = 1.0;
 
 	Ndarray<int, 3> boards(
@@ -1170,10 +1229,12 @@ void not_autoplay_test_batchmcts()
 
 void run_all_tests()
 {
-	print_test(&batch_mcts_testcorrectness, "batch mcts corectness");
+	// print_test(&batch_mcts_testcorrectness, "batch mcts corectness");
 	print_test(&batch_mcts_test, "batch mcts");
+	// print_test(&test_memmanager, "Memory Manager Test");
 	if (false)
 	{
+		print_test(&memory_test, "Memory Test");
 		print_test(&batch_mcts_test, "batch mcts");
 		print_test(&not_autoplay_test, "not autoplay test");
 		print_test(&not_autoplay_test_batchmcts, "not autoplay test batchmcts version");
@@ -1194,6 +1255,5 @@ void run_all_tests()
 		print_test(&policy_completeness_test, "Policy Completeness Test");
 		print_test(&policy_rotation_test, "Policy Rotation Test");
 		print_test(&select_and_update_no_errors, "Select and Update no Errors Test");
-		// print_test(&memory_test, "Memory Test");
 	}
 }

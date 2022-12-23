@@ -18,6 +18,4 @@ extern Ndarray<float, 3> DUMMY_POLICY;
 const float_t DUMMY_Q = 0.0;
 extern Ndarray<int, 3> move2index_cache;
 
-
 extern void init_move2index_cache();
-

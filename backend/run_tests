@@ -1,2 +1,2 @@
-g++ -std=c++17 -Ofast BatchMCTS.cpp Constants.cpp main.cpp MCTS.cpp position.cpp tables.cpp tests.cpp types.cpp tbprobe.cpp tablebase_evaluation.cpp -o ./output/main.o -pthread
+g++ -std=c++17 -Ofast BatchMCTS.cpp Constants.cpp main.cpp MCTS.cpp position.cpp tables.cpp tests.cpp types.cpp tbprobe.cpp tablebase_evaluation.cpp memmanager.cpp -g -o ./output/main.o -pthread
 ./output/main.o

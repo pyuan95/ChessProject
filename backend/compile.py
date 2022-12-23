@@ -23,6 +23,7 @@ files = [
     "extension_BatchMCTS.cpp",
     "tbprobe.cpp",
     "tablebase_evaluation.cpp",
+    "memmanager.cpp",
 ]
 files = [f.replace(".cpp", "") for f in files]
 for f in files:
