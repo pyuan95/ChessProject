@@ -381,8 +381,11 @@ void Position::undo(const Move m)
 {
 	ply_without_capture_or_pawn_move.pop_back();
 	auto h = get_hash();
-	if (position_history.count(h))
+	auto cnt = position_history.count(h);
+	if (cnt >= 2)
 		position_history[h]--;
+	else if (cnt == 1)
+		position_history.erase(h);
 
 	MoveFlags type = m.flags();
 	switch (type)

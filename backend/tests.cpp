@@ -899,15 +899,15 @@ void batch_mcts_testcorrectness()
 
 void batch_mcts_test()
 {
-	int iterations = 25000;
+	int iterations = 75000;
 	int num_sims_per_move = 1600;
 	float temperature = 1.0;
 	bool autoplay = true;
 	string output = "./games/game";
 	output = "";
 
-	int num_threads = 1;
-	int batch_size = 1;
+	int num_threads = 8;
+	int batch_size = 1024;
 	int num_sectors = 1;
 	float cpuct = 1.0;
 

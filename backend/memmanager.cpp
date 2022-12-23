@@ -2,6 +2,7 @@
 #include <iostream>
 int64_t MemoryBlock::resize(uint32_t size)
 {
+    std::cout << "resizing from " << this->size() << " bytes to " << size << " bytes. had " << count_free_memory() << " bytes free before\n";
     uint8_t *newmemory = (uint8_t *)realloc(memory, size);
     int64_t diff = newmemory - memory;
     memory = newmemory;
@@ -13,9 +14,7 @@ int64_t MemoryBlock::resize(uint32_t size)
 
 uint8_t *MemoryBlock::malloc_(uint32_t size)
 {
-    uint32_t cur = starting_allocation_size;
-    while (cur < size)
-        cur += cur;
+    uint32_t cur = get_piece_size(size);
     if (recycling.count(cur) && recycling[cur].size() > 0)
     {
         uint32_t displacement = recycling[cur].back();
@@ -33,9 +32,7 @@ uint8_t *MemoryBlock::malloc_(uint32_t size)
 
 uint8_t *MemoryBlock::realloc_(uint8_t *ptr, uint32_t prevsize, uint32_t newsize)
 {
-    uint32_t cur = starting_allocation_size;
-    while (cur < prevsize)
-        cur += cur;
+    uint32_t cur = get_piece_size(prevsize);
     if (newsize <= cur)
         return ptr;
     uint8_t *newptr = malloc_(newsize);
@@ -46,9 +43,7 @@ uint8_t *MemoryBlock::realloc_(uint8_t *ptr, uint32_t prevsize, uint32_t newsize
 
 void MemoryBlock::free_(uint8_t *ptr, uint32_t size)
 {
-    uint32_t cur = starting_allocation_size;
-    while (cur < size)
-        cur += cur;
+    uint32_t cur = get_piece_size(size);
     uint32_t displacement = (ptr - memory) / starting_allocation_size;
     recycling[cur].push_back(displacement);
 }

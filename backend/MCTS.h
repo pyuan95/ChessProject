@@ -327,10 +327,9 @@ CLass invariant: root -> color == p.turn().
 class MCTS
 {
 private:
-	static uint32_t const default_block_size = 640000;
-	static uint32_t const default_starting_size = 100;
-	static uint32_t const max_possible_allocation_request = MAX_MOVES * (3 + sizeof(MCTSNode) + 3) * 2;
-
+	static const uint32_t default_block_size;
+	static const uint32_t default_starting_size;
+	static const uint32_t max_possible_allocation_request;
 	MCTSNode *root;
 	MCTSNode *best_leaf;
 	Move *moves;
@@ -519,8 +518,8 @@ public:
 		 float t = 1.0,
 		 bool auto_play = true,
 		 string output = "") : MCTS(num_sims_per_move,
-									std::make_shared<MemoryBlock>(default_block_size, default_starting_size),
-									t, auto_play, output) {}
+									std::make_shared<DefaultMemoryManager>(), t,
+									auto_play, output) {}
 	~MCTS()
 	{
 		if (root != nullptr)

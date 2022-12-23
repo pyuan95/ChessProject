@@ -567,3 +567,7 @@ ostream &operator<<(ostream &os, const BoardState &b)
 	}
 	return os;
 }
+
+uint32_t const MCTS::default_block_size = 1280000;
+uint32_t const MCTS::default_starting_size = 150;
+uint32_t const MCTS::max_possible_allocation_request = MAX_MOVES * (3 + sizeof(MCTSNode) + 3) * 2;
