@@ -203,7 +203,7 @@ void MCTSNode::expand(
 		for (int i = 0; i < size; i++)
 		{
 			set_move_at(i, leaves[i].first);
-			set_prob_at(i, leaves[i].second);
+			set_prob_at(i, leaves[i].second / tot);
 		}
 	}
 }
@@ -235,6 +235,7 @@ void MCTS::add_move(BoardState &board_state, Policy &policy, LegalMoves &legal_m
 		output << "\n";
 		output << m << "\n";
 		output << c << "\n";
+		output.flush();
 	}
 	move_num++;
 }

@@ -84,3 +84,6 @@ x64/Debug/Constants.obj
 x64/Debug/Constants.obj
 *.obj
 x64/Debug/Constants.obj
+./games
+./saved_model
+./checkpoints

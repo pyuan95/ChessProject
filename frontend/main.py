@@ -3,48 +3,55 @@ from utils import *
 from model import ChessModel
 import tensorflow as tf
 from constants import *
+from datetime import datetime
+from tensorflow.python.compiler.tensorrt import trt_convert as trt
+import os
+
 
 # BatchMCTS settings
-num_sims_per_move: int = 1600
+num_sims_per_move: int = 15
 temperature: float = 1.0
 autoplay: bool = True
 output_directory = "./games"
 output: str = output_directory + "/game"
-output = ""
-num_threads: int = 4
-batch_size: int = 2048
-num_sectors: int = 2
-cpuct: float = 0.05
+num_threads: int = 8
+batch_size: int = 8192
+num_sectors: int = 1
+cpuct: float = 0.01
 boards: np.ndarray = np.zeros([num_sectors, batch_size, ROWS, COLS], dtype=np.int32)
 boards_reshaped: np.ndarray = boards.reshape([num_sectors * batch_size, ROWS, COLS])
 metadata: np.ndarray = np.zeros([num_sectors, batch_size, METADATA_LENGTH], dtype=np.int32)
 metadata_reshaped: np.ndarray = metadata.reshape([num_sectors * batch_size, METADATA_LENGTH])
 tablebase_path: str = "../backend/tablebase"
 
+# delete games
+if output_directory:
+    os.system("rm {0}/*".format(output_directory))
+
 # play options
 play_options = {
     "num_sims_per_move": 2000,
     "temperature": 1.0,
     "autoplay": False,
-    "output": "",
     "num_threads": 4,
-    "batch_size": 400,
+    "batch_size": 200,
     "num_sectors": 1,
-    "cpuct": 0.05,
+    "cpuct": cpuct,
     "tablebase_path": tablebase_path,
 }
 
 # model settings
-num_layers = 4
-depth = 48
-d_fnn = 64
+num_layers = 3
+depth = 64
+d_fnn = 96
 
 # train settings
-num_moves_per_inference = 500
+num_moves_per_inference = 1200
 checkpoint_dir = "./checkpoints"
+saved_model_dir = "./saved_model"
 log_file = open("./log.txt", "a")
 regularization_weight = 1e-4
-train_batch_size = 256
+train_batch_size = 4096
 
 batch_mcts = BatchMCTS(
     num_sims_per_move,
@@ -65,7 +72,10 @@ optimizer = tf.keras.optimizers.Adam()
 checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=model)
 manager = tf.train.CheckpointManager(checkpoint, directory=checkpoint_dir, max_to_keep=10)
 status = checkpoint.restore(manager.latest_checkpoint)
-
+# compile the model
+model(boards[0], metadata[0])
+model.compile(optimizer=optimizer)
+model.summary()
 
 ##############################################
 # Train loop!
@@ -77,27 +87,40 @@ def pnl(x):
     log_file.flush()
 
 
-out_policy = np.ones([batch_size, ROWS, COLS, NUM_MOVES_PER_SQUARE], dtype=np.float32)
-out_q = np.zeros([batch_size], dtype=np.float32)
+def update(out_q, out_policy):
+    batch_mcts.update(out_q.reshape(-1), out_policy)
 
 
-while True:
+@tf.function
+def inference_helper(trt_func):
     batch_mcts.select()
     cur_sector = batch_mcts.current_sector()
     b = boards[cur_sector]
     m = metadata[cur_sector]
-    batch_mcts.update(out_q, out_policy)
+    result = trt_func(tf.constant(b), tf.constant(m))
+    out_policy_, out_q_ = result["output_1"], result["output_2"]
+    tf.numpy_function(func=update, inp=[out_q_, out_policy_], Tout=[])
+
+
+def get_trtfunc(model):
+    model.save(saved_model_dir, save_format="tf")
+    converter = trt.TrtGraphConverterV2(input_saved_model_dir=saved_model_dir, precision_mode=trt.TrtPrecisionMode.FP32)
+    trt_func = converter.convert()
+
+    def input_fn():
+        yield [boards[0], metadata[0]]
+
+    converter.build(input_fn=input_fn)
+
+    return trt_func
+
 
 # does inference using batch_mcts
 def inference(loop_num):
     pnl("began inference loop {0}!".format(loop_num))
+    trt_func = get_trtfunc(model)
     for i in range(num_moves_per_inference * num_sims_per_move):
-        batch_mcts.select()
-        cur_sector = batch_mcts.current_sector()
-        b = boards[cur_sector]
-        m = metadata[cur_sector]
-        out_policy, out_q = model.call(b, m)
-        batch_mcts.update(out_q.numpy().flatten().astype(np.float32), out_policy.numpy().astype(np.float32))
+        inference_helper(trt_func)
         if i > 0 and i % (100 * num_sims_per_move) == 0:
             pnl(
                 "finished inference move {0}/{1} in loop {2}!".format(
@@ -105,7 +128,9 @@ def inference(loop_num):
                 )
             )
         if i % num_sims_per_move == 0 and i:
-            print("finished move", i // num_sims_per_move)
+            now = datetime.now()
+            current_time = now.strftime("%H:%M:%S")
+            print("finished move", i // num_sims_per_move, "current time is:", current_time)
     pnl("finished inference loop {0}!".format(loop_num))
 
 
@@ -114,7 +139,7 @@ def train(loopidx):
     pnl("Training on {0} games! Guessing {1} batches".format(num_games, num_games * 250 / train_batch_size))
     train_loss = tf.keras.metrics.Mean()
     for i, batch in enumerate(generate_batches_from_directory(output_directory, train_batch_size)):
-        print(i)
+        print("batch:", i)
         b = batch["board"]
         m = batch["metadata"]
         p = batch["policy"]
@@ -123,7 +148,7 @@ def train(loopidx):
         l = batch["legal moves"]
         l = l.reshape([l.shape[0], -1])
         with tf.GradientTape() as tape:
-            out_policy, out_value = model.call(b, m)
+            out_policy, out_value = model(b, m)
             out_value = tf.reshape(out_value, [-1])
             out_policy = tf.reshape(out_policy, [out_policy.shape[0], -1])  # (batch size, num_moves)
             out_policy += (1 - l) * -1e6  # illegal moves should be zeroed out

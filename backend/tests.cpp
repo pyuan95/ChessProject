@@ -899,16 +899,16 @@ void batch_mcts_testcorrectness()
 
 void batch_mcts_test()
 {
-	int iterations = 75000;
-	int num_sims_per_move = 1600;
+	int iterations = 750000;
+	int num_sims_per_move = 1200;
 	float temperature = 1.0;
 	bool autoplay = true;
 	string output = "./games/game";
 	output = "";
 
 	int num_threads = 8;
-	int batch_size = 1024;
-	int num_sectors = 1;
+	int batch_size = 4096;
+	int num_sectors = 2;
 	float cpuct = 1.0;
 
 	Ndarray<int, 3> boards(
