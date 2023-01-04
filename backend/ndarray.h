@@ -58,6 +58,7 @@ public:
     typename getItemTraits<datatype, ndim>::returnType operator[](unsigned long i);
     void destroy();
     void init(datatype t);
+    inline void printdata() { std::cout << (long)data << "\n"; }
 };
 
 // Ndarray constructor
@@ -163,6 +164,7 @@ public:
     typename getItemTraits<datatype, 1>::returnType operator[](unsigned long i);
     void destroy();
     void init(datatype t);
+    inline void printdata() { std::cout << (long)data << "\n"; }
 };
 
 // Ndarray partial specialised constructor

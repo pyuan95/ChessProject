@@ -22,6 +22,7 @@ BatchMCTSExtension.createBatchMCTS.argtypes = [
     Structure,
 ]
 BatchMCTSExtension.select.argtypes = [POINTER(c_char)]
+BatchMCTSExtension.wait_until_no_workers.argtypes = [POINTER(c_char)]
 BatchMCTSExtension.update.argtypes = [POINTER(c_char), Structure, Structure]
 BatchMCTSExtension.set_temperature.argtypes = [POINTER(c_char), c_float]
 BatchMCTSExtension.play_best_moves.argtypes = [POINTER(c_char), c_bool]
@@ -49,8 +50,8 @@ class BatchMCTS:
         cpuct: float,
         boards_: np.ndarray,
         metadata_: np.ndarray,
-        tablebase_path: str,
     ) -> None:
+        self.batch_size = batch_size
         boards = c_ndarray(boards_)
         metadata = c_ndarray(metadata_)
         # make caches to keep arrays in memory as required by BatchMCTS
@@ -58,8 +59,6 @@ class BatchMCTS:
         self.update_cache = deque()
         self.num_sectors = num_sectors
         output = c_char_p(bytes(output, encoding="utf8"))
-        tablebase_path = c_char_p(bytes(tablebase_path, encoding="utf8"))
-        BatchMCTSExtension.initialize(tablebase_path)
         self.ptr = BatchMCTSExtension.createBatchMCTS(
             num_sims_per_move,
             c_float(temperature),
@@ -78,6 +77,9 @@ class BatchMCTS:
 
     def select(self) -> None:
         BatchMCTSExtension.select(self.ptr)
+
+    def wait_until_no_workers(self) -> None:
+        BatchMCTSExtension.wait_until_no_workers(self.ptr)
 
     def update(self, q_: np.ndarray, policy_: np.ndarray) -> None:
         q = c_ndarray(q_)

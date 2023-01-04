@@ -87,6 +87,11 @@ extern "C"
             m->set_temperature(temp);
         }
 
+        void wait_until_no_workers(BatchMCTS *m)
+        {
+            m->wait_until_no_workers();
+        }
+
         void play_best_moves(BatchMCTS *m, bool reset)
         {
             m->play_best_moves(reset);

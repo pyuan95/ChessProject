@@ -1,24 +1,7 @@
-began inference loop 0!
-began inference loop 0!
-began inference loop 0!
-began inference loop 0!
-began inference loop 0!
-began inference loop 0!
-began inference loop 0!
-began inference loop 0!
-began inference loop 0!
-began inference loop 0!
-began inference loop 0!
-began inference loop 0!
-began inference loop 0!
-began inference loop 0!
-began inference loop 0!
-began inference loop 0!
-began inference loop 0!
-began inference loop 0!
-began inference loop 0!
 finished inference move 100/1200 in loop 0!
 finished inference move 200/1200 in loop 0!
 finished inference move 300/1200 in loop 0!
-began inference loop 0!
-finished inference move 100/1200 in loop 0!
+finished inference move 400/1200 in loop 0!
+finished inference move 500/1200 in loop 0!
+finished inference move 600/1200 in loop 0!
+finished inference move 700/1200 in loop 0!

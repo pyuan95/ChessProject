@@ -318,18 +318,14 @@ bool MCTS::select(const float cpuct, Ndarray<int, 2> board, Ndarray<int, 1> meta
 			Move *last = p.generate_legals<WHITE>(moves);
 			nmoves = last - moves;
 			if (nmoves == 0)
-			{
 				itp = true;
-			}
 		}
 		else
 		{
 			Move *last = p.generate_legals<BLACK>(moves);
 			nmoves = last - moves;
 			if (nmoves == 0)
-			{
 				itp = true;
-			}
 		}
 		if (itp)
 			best_leaf->mark_terminal_position();
@@ -471,14 +467,8 @@ void MCTS::update(const float q, Ndarray<float, 3> policy)
 	}
 
 	Color best_leaf_color = best_leaf->get_color();
-	if (nmoves > 0 && best_leaf_color == WHITE)
-	{
+	if (nmoves > 0)
 		best_leaf->expand(p, policy, moves, nmoves, leaves, *memory_manager);
-	}
-	else if (nmoves > 0 && best_leaf_color == BLACK)
-	{
-		best_leaf->expand(p, policy, moves, nmoves, leaves, *memory_manager);
-	}
 
 	best_leaf = nullptr;
 

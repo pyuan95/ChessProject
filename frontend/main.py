@@ -9,20 +9,25 @@ import os
 
 
 # BatchMCTS settings
-num_sims_per_move: int = 15
+num_sims_per_move: int = 1200
 temperature: float = 1.0
 autoplay: bool = True
 output_directory = "./games"
 output: str = output_directory + "/game"
 num_threads: int = 8
-batch_size: int = 8192
-num_sectors: int = 1
+batch_size: int = 4096
+num_sectors: int = 2
 cpuct: float = 0.01
 boards: np.ndarray = np.zeros([num_sectors, batch_size, ROWS, COLS], dtype=np.int32)
 boards_reshaped: np.ndarray = boards.reshape([num_sectors * batch_size, ROWS, COLS])
 metadata: np.ndarray = np.zeros([num_sectors, batch_size, METADATA_LENGTH], dtype=np.int32)
 metadata_reshaped: np.ndarray = metadata.reshape([num_sectors * batch_size, METADATA_LENGTH])
 tablebase_path: str = "../backend/tablebase"
+num_moves_per_inference = 250
+
+# initialize
+tablebase_path = c_char_p(bytes(tablebase_path, encoding="utf8"))
+BatchMCTSExtension.initialize(tablebase_path)
 
 # delete games
 if output_directory:
@@ -37,16 +42,14 @@ play_options = {
     "batch_size": 200,
     "num_sectors": 1,
     "cpuct": cpuct,
-    "tablebase_path": tablebase_path,
 }
 
 # model settings
-num_layers = 3
-depth = 64
-d_fnn = 96
+num_layers = 2
+depth = 48
+d_fnn = 60
 
 # train settings
-num_moves_per_inference = 1200
 checkpoint_dir = "./checkpoints"
 saved_model_dir = "./saved_model"
 log_file = open("./log.txt", "a")
@@ -64,7 +67,6 @@ batch_mcts = BatchMCTS(
     cpuct,
     boards_reshaped,
     metadata_reshaped,
-    tablebase_path,
 )
 
 model = ChessModel(num_layers, depth, d_fnn)
@@ -77,11 +79,11 @@ model(boards[0], metadata[0])
 model.compile(optimizer=optimizer)
 model.summary()
 
-##############################################
-# Train loop!
+######################### Helper functions ###############################
 
-# print n log
+
 def pnl(x):
+    # print n log
     print(x)
     log_file.write(x + "\n")
     log_file.flush()
@@ -92,17 +94,20 @@ def update(out_q, out_policy):
 
 
 @tf.function
-def inference_helper(trt_func):
-    batch_mcts.select()
-    cur_sector = batch_mcts.current_sector()
-    b = boards[cur_sector]
-    m = metadata[cur_sector]
-    result = trt_func(tf.constant(b), tf.constant(m))
-    out_policy_, out_q_ = result["output_1"], result["output_2"]
+def inference_helper(b, m):
+    result = model(b, m)
+    out_policy_, out_q_ = result
     tf.numpy_function(func=update, inp=[out_q_, out_policy_], Tout=[])
 
 
 def get_trtfunc(model):
+    """
+    def func(a, b):
+        outp, outq = model(a, b)
+        return {"output_1": outp, "output_2": outq}
+
+    return func
+    """
     model.save(saved_model_dir, save_format="tf")
     converter = trt.TrtGraphConverterV2(input_saved_model_dir=saved_model_dir, precision_mode=trt.TrtPrecisionMode.FP32)
     trt_func = converter.convert()
@@ -115,12 +120,17 @@ def get_trtfunc(model):
     return trt_func
 
 
+###################### Train loop! ###############################
 # does inference using batch_mcts
 def inference(loop_num):
     pnl("began inference loop {0}!".format(loop_num))
-    trt_func = get_trtfunc(model)
+    # trt_func = get_trtfunc(model)
     for i in range(num_moves_per_inference * num_sims_per_move):
-        inference_helper(trt_func)
+        batch_mcts.select()
+        cur_sector = batch_mcts.current_sector()
+        b = boards[cur_sector]
+        m = metadata[cur_sector]
+        inference_helper(b, m)
         if i > 0 and i % (100 * num_sims_per_move) == 0:
             pnl(
                 "finished inference move {0}/{1} in loop {2}!".format(
