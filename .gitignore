@@ -84,6 +84,6 @@ x64/Debug/Constants.obj
 x64/Debug/Constants.obj
 *.obj
 x64/Debug/Constants.obj
-./frontend/games/*
-./frontend/saved_model/*
-./frontend/checkpoints/*
+frontend/games/*
+frontend/saved_model/*
+frontend/checkpoints/*
