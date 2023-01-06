@@ -69,6 +69,8 @@ class ChessModel(tf.keras.Model):
         super(ChessModel, self).__init__()
         rows_depth = int(depth // 2)
         cols_depth = depth - rows_depth
+        self.rows_depth = rows_depth
+        self.cols_depth = cols_depth
         self.depth = depth
         self.rows = tf.Variable(
             tf.random_normal_initializer()(shape=[1, ROWS, 1, rows_depth], dtype=tf.float32),
@@ -80,14 +82,7 @@ class ChessModel(tf.keras.Model):
             trainable=True,
             name="cols",
         )
-        self.positional_encoding = tf.concat(
-            [
-                self.rows + tf.zeros([1, ROWS, COLS, rows_depth], dtype=tf.float32),
-                self.cols + tf.zeros([1, ROWS, COLS, cols_depth], dtype=tf.float32),
-            ],
-            axis=-1,
-            name="positional_encoding",
-        )
+
         self.value_encoding = tf.Variable(
             tf.random_normal_initializer()(shape=[1, 1, depth], dtype=tf.float32), trainable=True, name="value_encoding"
         )
@@ -136,7 +131,15 @@ class ChessModel(tf.keras.Model):
         board = tf.concat([board, metadata, epsq], axis=3)  # (batch size, ROWS, COLS, depth_0), type = int
         board = tf.cast(board, tf.float32)
         board = self.encoding(board)  # (batch size, ROWS, COLS, depth)
-        board += self.positional_encoding
+        positional_encoding = tf.concat(
+            [
+                self.rows + tf.zeros([1, ROWS, COLS, self.rows_depth], dtype=tf.float32),
+                self.cols + tf.zeros([1, ROWS, COLS, self.cols_depth], dtype=tf.float32),
+            ],
+            axis=-1,
+            name="positional_encoding",
+        )
+        board += positional_encoding
         board = tf.reshape(board, [-1, ROWS * COLS, self.depth])  # (batch size, 64, depth)
         board = tf.concat(
             [

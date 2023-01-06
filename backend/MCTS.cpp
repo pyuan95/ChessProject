@@ -501,9 +501,7 @@ void MCTSNode::recursive_delete(MCTSNode &n, MCTSNode *ignore, bool isroot, Memo
 		return;
 	MCTSNode *nodes = n.begin_nodes();
 	for (int i = 0; i < n.get_num_expanded(); i++)
-	{
 		recursive_delete(nodes[i], ignore, false, m);
-	}
 	if (n.get_num_children() > 0)
 		m.free_(n.begin_children(), n.size_of_children());
 	if (isroot)

@@ -1,7 +1,158 @@
-finished inference move 100/1200 in loop 0!
-finished inference move 200/1200 in loop 0!
-finished inference move 300/1200 in loop 0!
-finished inference move 400/1200 in loop 0!
-finished inference move 500/1200 in loop 0!
-finished inference move 600/1200 in loop 0!
-finished inference move 700/1200 in loop 0!
+began inference loop 0!
+finished inference move 100/250 in loop 0!
+finished inference move 200/250 in loop 0!
+finished inference loop 0!
+Training on 35136 games! Guessing 2144.53125 batches
+Training on 0 games! Guessing 0.0 batches
+finished train loop 0! loss was 0.0
+Training on 6 games! Guessing 0.3662109375 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+Training on -8186 games! Guessing -499.6337890625 batches
+finished train loop 0! loss was 3.3348147869110107
+began inference loop 0!
+began inference loop 0!
+finished inference move 100/250 in loop 0!
+finished inference move 200/250 in loop 0!
+finished inference loop 0!
+Training on 2381 games! Guessing 145.32470703125 batches
+finished train loop 0! loss was 4.150303363800049
+began inference loop 1!
+Training on 0 games! Guessing 0.0 batches
+finished train loop 0! loss was 0.0
+Training on 0 games! Guessing 0.0 batches
+finished train loop 0! loss was 0.0
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!
+Training on 414 games! Guessing 25.2685546875 batches
+Training on 414 games! Guessing 25.2685546875 batches
+finished train loop 0! loss was 2.749620199203491
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!
+finished inference move 100/250 in loop 0!
+finished inference move 200/250 in loop 0!
+finished inference loop 0!
+Training on 3073 games! Guessing 187.56103515625 batches
+Training on 19457 games! Guessing 1187.56103515625 batches
+Training on 3003 games! Guessing 183.28857421875 batches
+finished train loop 0! loss was 3.016914129257202
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!
+began inference loop 0!
+finished inference loop 0!
+Training on 0 games! Guessing 0.0 batches
+finished train loop 0! loss was 0.0
+began inference loop 1!
+finished inference loop 1!
+Training on 0 games! Guessing 0.0 batches
+finished train loop 1! loss was 0.0
+began inference loop 2!
+finished inference loop 2!
+Training on 0 games! Guessing 0.0 batches
+finished train loop 2! loss was 0.0
+began inference loop 3!
+finished inference loop 3!
+Training on 0 games! Guessing 0.0 batches
+finished train loop 3! loss was 0.0
+began inference loop 4!
+finished inference loop 4!
+Training on 0 games! Guessing 0.0 batches
+finished train loop 4! loss was 0.0
+began inference loop 5!
+finished inference loop 5!
+Training on 0 games! Guessing 0.0 batches
+finished train loop 5! loss was 0.0
+began inference loop 6!
+finished inference loop 6!
+Training on 0 games! Guessing 0.0 batches
+finished train loop 6! loss was 0.0
+began inference loop 7!
+finished inference loop 7!
+Training on 0 games! Guessing 0.0 batches
+finished train loop 7! loss was 0.0
+began inference loop 8!
+finished inference loop 8!
+Training on 0 games! Guessing 0.0 batches
+finished train loop 8! loss was 0.0
+began inference loop 9!
+finished inference loop 9!
+Training on 0 games! Guessing 0.0 batches
+finished train loop 9! loss was 0.0
+began inference loop 10!
+finished inference loop 10!
+Training on 0 games! Guessing 0.0 batches
+finished train loop 10! loss was 0.0
+playing games...
+began inference loop 0!
+finished inference loop 0!
+Training on 8096 games! Guessing 494.140625 batches
+finished train loop 0! loss was 0.0
+began inference loop 1!
+finished inference loop 1!
+Training on 8096 games! Guessing 494.140625 batches
+finished train loop 1! loss was 0.0
+began inference loop 2!
+finished inference loop 2!
+Training on 8096 games! Guessing 494.140625 batches
+finished train loop 2! loss was 0.0
+began inference loop 3!
+finished inference loop 3!
+Training on 8096 games! Guessing 494.140625 batches
+finished train loop 3! loss was 0.0
+began inference loop 4!
+finished inference loop 4!
+Training on 8096 games! Guessing 494.140625 batches
+finished train loop 4! loss was 0.0
+began inference loop 5!
+finished inference loop 5!
+Training on 8096 games! Guessing 494.140625 batches
+finished train loop 5! loss was 0.0
+began inference loop 6!
+finished inference loop 6!
+Training on 8096 games! Guessing 494.140625 batches
+finished train loop 6! loss was 0.0
+began inference loop 7!
+finished inference loop 7!
+Training on 8096 games! Guessing 494.140625 batches
+finished train loop 7! loss was 0.0
+began inference loop 8!
+finished inference loop 8!
+Training on 8096 games! Guessing 494.140625 batches
+finished train loop 8! loss was 0.0
+began inference loop 9!
+finished inference loop 9!
+Training on 8096 games! Guessing 494.140625 batches
+finished train loop 9! loss was 0.0
+began inference loop 10!
+finished inference loop 10!
+Training on 8096 games! Guessing 494.140625 batches
+finished train loop 10! loss was 0.0
+playing games...
+began inference loop 0!
